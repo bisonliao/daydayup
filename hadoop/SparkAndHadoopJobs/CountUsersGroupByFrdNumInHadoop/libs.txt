@@ -1,0 +1,4 @@
+hadoop-common-2.5.2.jar
+hadoop-hdfs-2.5.2.jar
+hadoop-mapreduce-client-core-2.5.2.jar
+hadoop-mapreduce-client-jobclient-2.5.2.jar

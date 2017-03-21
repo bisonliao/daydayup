@@ -1,0 +1,5 @@
+从网上摘抄的一些代码，如果侵权请联系我删除掉
+
+CapturePicFromMovie：从视频文件里提取图片文件和声音（pcm)
+ConvertAudio:将pcm声音文件转化为aac编码，运行会报错，不知怎么回事
+PushFlvByRtmp：将flv文件用librtmp推流到srs服务器

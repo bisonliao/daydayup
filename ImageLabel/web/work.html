@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<!-- saved from url=(0079)http://10.198.14.14/open_proj/proj_qcloud_v2/gateway/event/pc/msec/index.html## -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta charset="utf-8">
+	<title>图片标注</title>
+	<meta name="keywords" content="">
+	<meta name="description" content="">
+	<link rel="stylesheet" type="text/css" href="./resource_files/msec.css">
+
+
+	<link rel="stylesheet" type="text/css" href="/css/bootstrap.min.css"/>
+	<link rel="stylesheet" href="/js/jquery_ui/jquery-ui.css">
+	<link rel="stylesheet" href="/js/jquery_ui/jquery-ui.structure.css">
+	<link rel="stylesheet" href="/js/jquery_ui/jquery-ui.theme.css">
+
+	<script type="text/javascript" src="/js/jquery-2.2.0.min.js"></script>
+	<script type="text/javascript" src="/js/jquery.form.js"></script>
+	<script type="text/javascript" src="/js/jquery.cookie.js"></script>
+	<script type="text/javascript" src="/js/jquery_ui/jquery-ui.js"></script>
+
+</head>
+<script type="application/javascript">
+
+	function deleteImage()
+	{
+		var filename = $('#imgFilename').val();
+
+
+		var   request={
+			"handleClass":"beans.service.DeleteImage",
+			"requestBody": {"image_filename":filename},
+		};
+
+		$.post("/JsonRPCServlet",
+				{request_string:JSON.stringify(request)},
+				function(data, status) {
+					if (status == "success") {//http通信返回200
+						if (data.status == 0) {//业务处理成功
+							//alert("成功删除:"+data.message);
+							fetchImage();
+						}
+						else{
+							alert("删除失败了："+data.message);
+						}
+					}
+					else{
+						alert("ajax通信失败");
+					}
+				});
+	}
+
+	function fetchImage()
+	{
+
+		var   request={
+			"handleClass":"beans.service.FetchNextImage",
+			"requestBody": {},
+		};
+
+		$.post("/JsonRPCServlet",
+				{request_string:JSON.stringify(request)},
+				function(data, status) {
+					if (status == "success") {//http通信返回200
+						if (data.status == 0) {//业务处理成功
+							//alert(data.imageFilename);
+							$("#imgShow").attr('src', "/data/images/"+data.imageFilename);
+							$("#imgFilename").val(data.imageFilename);
+							$("#imgLabel").empty();
+							var labelList = data.labelTextList;
+							labelList.sort();
+							for(var i=0;i<labelList.length;i++){
+								var oneLabel = labelList[i];
+								$("#imgLabel").append("<option value='"+i+"'>"+oneLabel+"</option>");
+							}
+							$("#imgLabel").find("option[value='"+data.label+"']").attr("selected",true);
+						}
+						else{
+							alert("failed to fetch next image："+data.message);
+						}
+					}
+					else{
+						alert("ajax通信失败");
+					}
+				});
+	}
+	function confirmImage()
+	{
+		var filename = $('#imgFilename').val();
+		var label = $('#imgLabel').val();
+
+		var   request={
+			"handleClass":"beans.service.ConfirmImage",
+			"requestBody": {"imageFilename":filename, "label": label},
+		};
+
+		$.post("/JsonRPCServlet",
+				{request_string:JSON.stringify(request)},
+				function(data, status) {
+					if (status == "success") {//http通信返回200
+						if (data.status == 0) {//业务处理成功
+							//alert("成功删除:"+data.message);
+							fetchImage();
+						}
+						else{
+							alert("失败了："+data.message);
+						}
+					}
+					else{
+						alert("ajax通信失败");
+					}
+				});
+	}
+	function saveWork()
+	{
+
+
+		var   request={
+			"handleClass":"beans.service.SaveWork",
+			"requestBody": {},
+		};
+
+		$.post("/JsonRPCServlet",
+				{request_string:JSON.stringify(request)},
+				function(data, status) {
+					if (status == "success") {//http通信返回200
+						if (data.status == 0) {//业务处理成功
+							alert("Saved. You can continue.")
+						}
+						else{
+							alert("失败了："+data.message);
+						}
+					}
+					else{
+						alert("ajax通信失败");
+					}
+				});
+	}
+
+	fetchImage();
+
+	</script>
+<body>
+
+<br>
+You have two choices:
+<br>
+1) check the label and confirm it
+<br>
+2) delete it if the sample is not proper
+<br>
+At last, remember to save you work.
+<br>
+&nbsp;&nbsp;label:&nbsp;
+<select id="imgLabel">
+</select>
+&nbsp;&nbsp;
+<button id="nextButton" onclick="confirmImage()">Confirm</button>
+<button id="delButton" onclick="deleteImage()">Delete</button>
+<button id="saveButton" onclick="saveWork()">Save my work ( heavy mission )</button>
+<br>
+<br>
+&nbsp;&nbsp;
+<img id="imgShow" src="imgs/exit.png"/>
+<input id="imgFilename" type="hidden"/>
+	<br>
+
+
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<!-- saved from url=(0079)http://10.198.14.14/open_proj/proj_qcloud_v2/gateway/event/pc/msec/index.html## -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta charset="utf-8">
+	<title>图片标注</title>
+	<meta name="keywords" content="">
+	<meta name="description" content="">
+	<link rel="stylesheet" type="text/css" href="./resource_files/msec.css">
+
+
+	<link rel="stylesheet" type="text/css" href="/css/bootstrap.min.css"/>
+	<link rel="stylesheet" href="/js/jquery_ui/jquery-ui.css">
+	<link rel="stylesheet" href="/js/jquery_ui/jquery-ui.structure.css">
+	<link rel="stylesheet" href="/js/jquery_ui/jquery-ui.theme.css">
+
+	<script type="text/javascript" src="/js/jquery-2.2.0.min.js"></script>
+	<script type="text/javascript" src="/js/jquery.form.js"></script>
+	<script type="text/javascript" src="/js/jquery.cookie.js"></script>
+	<script type="text/javascript" src="/js/jquery_ui/jquery-ui.js"></script>
+
+</head>
+<script type="application/javascript">
+
+	function JustDoIt()
+	{
+		var workerid = $('#workerid').val();
+
+
+
+
+		var   request={
+			"handleClass":"beans.service.SetWorkerID",
+			"requestBody": {"workerID":workerid},
+		};
+		alert(JSON.stringify(request));
+
+		$.post("/JsonRPCServlet",
+				{request_string:JSON.stringify(request)},
+				function(data, status) {
+					if (status == "success") {//http通信返回200
+						if (data.status == 0) {//业务处理成功
+							window.location.href = "/work.html";
+						}
+						else{
+							alert("error："+data.message);
+						}
+					}
+					else{
+						alert("ajax通信失败");
+					}
+				});
+	}
+	</script>
+<body>
+
+
+    标注者名称（c语言变量标识符规则）：<input type="text" id="workerid" />
+	<button id="goButton" onclick="JustDoIt()">GO</button>
+
+</body>
+</html>

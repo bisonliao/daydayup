@@ -295,7 +295,7 @@ static int bigint_div(const BigInt * a, uint32_t b, BigInt * result, BigInt * le
 		{
 			aa.cnt--;
 		}
-		if (aa.cnt == 0) { *left = aa; return 0;} // 被除数是0
+		if (aa.cnt == 0) {break;} // 被除数是0
 
 		int  len;
 	

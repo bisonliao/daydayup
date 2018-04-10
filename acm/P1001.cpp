@@ -68,6 +68,7 @@ static int bigint_init2(BigInt * r, uint32_t v)//³õÊ¼»¯rÎªv
 static int bigint_add(const BigInt* a, const BigInt * b, BigInt * result)
 {
 	if (a == NULL || b == NULL || result == NULL) { return -1;}
+	if (a == result || b == result) { return -1;}
 
 	bigint_init(result);
 	int m = a->cnt;
@@ -101,6 +102,7 @@ static int bigint_add(const BigInt* a, const BigInt * b, BigInt * result)
 static int bigint_multi(const BigInt* a, uint8_t b, BigInt * result)
 {
 	if (a == NULL  || result == NULL) { return -1;}
+	if (a == result ) { return -1;}
 
 	bigint_init(result);
 
@@ -177,6 +179,7 @@ static uint64_t bigint_getint(const BigInt* a)
 static int bigint_multi2(const BigInt* a, uint32_t b, BigInt * result)
 {
 	if (a == NULL || result == NULL) {return -1;}
+	if (a == result ) { return -1;}
 	bigint_init(result);
 
 	int i;
@@ -216,6 +219,7 @@ static int bigint_compare(const BigInt * a, const BigInt * b)
 static int bigint_sub(const BigInt* a, const BigInt * b, BigInt * result)
 {
 	if (a == NULL || b == NULL || result == NULL) { return -1;}
+	if (a == result || b == result) { return -1;}
 	if (bigint_compare(a,b) < 0) { return -2;}
 
 	bigint_init(result);
@@ -252,6 +256,7 @@ static int bigint_sub(const BigInt* a, const BigInt * b, BigInt * result)
 static int bigint_div(const BigInt * a, const BigInt * b, BigInt * result, BigInt * left)
 {
 	if (a == NULL || b == NULL || result == NULL || left == NULL) { return -1;}
+	if (a == result || b == result || left == a || left == b) { return -1;}
 	
 	bigint_init(result);
 	BigInt one, aa, zero;
@@ -282,6 +287,7 @@ static int bigint_div(const BigInt * a, const BigInt * b, BigInt * result, BigIn
 static int bigint_div(const BigInt * a, uint32_t b, BigInt * result, BigInt * left)
 {
 	if (a == NULL ||  result == NULL || left == NULL) { return -1;}
+	if (a == result  || left == a ) { return -1;}
 	if (b == 0 ) { return -2;}
 	bigint_init(result);
 	BigInt bb, aa;

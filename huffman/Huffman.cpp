@@ -16,7 +16,7 @@
 #include <sys/stat.h>
 using namespace std;
 
-
+using namespace bison;
 
 
 BitString::BitString()
@@ -112,9 +112,9 @@ void BitString::increase()
 
 }
 
-HuffmanItem::HuffmanItem(uint32_t value, uint32_t freq)
+HuffmanItem::HuffmanItem(uint32_t symbol, uint32_t freq)
 {
-	this->value = value;
+	this->symbol = symbol;
 	this->frequency = freq;
 
 	left = NULL;
@@ -133,7 +133,7 @@ HuffmanItem::HuffmanItem()
 }
 HuffmanItem & HuffmanItem::operator=(const HuffmanItem & a)
 {
-	this->value = a.value;
+	this->symbol = a.symbol;
 	this->frequency = a.frequency;
 	//this->code = a.code;
 	//this->ccode = a.ccode
@@ -173,15 +173,15 @@ int HuffmanItem::item_cmp2(const void*a, const void*b)
 	}
 	if (p1->code.get_bit_num() == p2->code.get_bit_num())
 	{
-		if (p1->value < p2->value)
+		if (p1->symbol < p2->symbol)
 		{
 			return -1;
 		}
-		if (p1->value == p2->value)
+		if (p1->symbol == p2->symbol)
 		{
 			return 0;
 		}
-		if (p1->value > p2->value)
+		if (p1->symbol > p2->symbol)
 		{
 			return 1;
 		}
@@ -313,7 +313,7 @@ void Huffman::print_leaf()
 	int i;
 	for (i = 0; i < leaf_num; ++i)
 	{
-		printf("%d:\n\tcode: ", leaf[i]->value);
+		printf("%u:\n\tcode: ", leaf[i]->symbol);
 		int j;
 		for (j = 0; j < leaf[i]->code.get_bit_num(); ++j)
 		{
@@ -370,7 +370,7 @@ int Huffman::encode(const uint32_t values[], uint32_t val_num,
 	int i;
 	for (i = 0; i < leaf_num; ++i)
 	{
-		value2code.insert(pair<uint32_t, BitString>(leaf[i]->value, leaf[i]->ccode) );
+		value2code.insert(pair<uint32_t, BitString>(leaf[i]->symbol, leaf[i]->ccode) );
 	}
 	uint32_t bit_index = 0;
 	for (i = 0; i < val_num ; ++i)
@@ -407,6 +407,45 @@ int Huffman::encode(const uint32_t values[], uint32_t val_num,
 	bit_num = bit_index;
 	return 0;
 }
+
+int Huffman::encode(InputStream & in, OutputStream & out)
+{
+	if (leaf == NULL || leaf_num < 2) { return -1;}
+	
+
+	//建立方便速查的map，输入被编码的值，输出码字
+	hash_map<uint32_t, BitString> value2code;
+	int i;
+	for (i = 0; i < leaf_num; ++i)
+	{
+		value2code.insert(pair<uint32_t, BitString>(leaf[i]->symbol, leaf[i]->ccode) );
+	}
+	
+	while (1)
+	{
+		uint32_t value;
+		if (in.get_one_symbol(value) != 0)//理解为读完了
+		{
+			break;
+		}
+
+		hash_map<uint32_t, BitString>::iterator it  = value2code.find(value);
+		if (it == value2code.end())
+		{
+			return -3;
+		}
+		const BitString & bs = it->second;
+
+		//把查到的码字一个一个bit追加到bits数组的末尾
+		int j;
+		for (j = 0; j < bs.get_bit_num(); ++j)
+		{
+			out.put_one_bit(bs.read_bit(j));
+		}
+	}
+	
+	return 0;
+}
 int Huffman::decode(uint32_t values[], uint32_t &val_num, 
 			const unsigned char  bits[], uint32_t  bit_num)
 {
@@ -420,11 +459,11 @@ int Huffman::decode(uint32_t values[], uint32_t &val_num,
 	int i;
 	for (i = 0; i < leaf_num; ++i)
 	{
-		uint32_t sym = leaf[i]->value;
+		uint32_t sym = leaf[i]->symbol;
 		int len = leaf[i]->ccode.get_bit_num();
 		counts[len]++;
 
-		symbols.push_back(leaf[i]->value);
+		symbols.push_back(leaf[i]->symbol);
 	}
 	
 	int bit_index = 0;
@@ -484,6 +523,86 @@ int Huffman::decode(uint32_t values[], uint32_t &val_num,
 
 
 }
+int Huffman::decode(InputStream &in, OutputStream & out)
+{
+	//反正网上没有像样的资料把这个过程说清楚，我不太确定
+	if (leaf == NULL || leaf_num < 2) { return -1;}
+	
+	//leaf数组里的item，是按照码字长度升序排列的，相同长度的码字，
+	// 按value的升序排列
+	vector<int> counts((size_t)(leaf_num), (int)0); //大小为leaf_num的数组，元素初始化为0
+	vector<uint32_t> symbols;
+	int i;
+	for (i = 0; i < leaf_num; ++i)
+	{
+		uint32_t sym = leaf[i]->symbol;
+		int len = leaf[i]->ccode.get_bit_num();
+		counts[len]++;
+
+		symbols.push_back(leaf[i]->symbol);
+	}
+	
+
+	bool endflag = false;
+	while (!endflag)
+	{
+
+		int len;            /* current number of bits in code */
+		int code;           /* len bits being decoded */
+		int first;          /* first code of length len */
+		int count;          /* number of codes of length len */
+		int index;          /* index of first code of length len in symbol table */
+
+		code = first = index = 0;
+	
+
+		int maxbitsnum = leaf[leaf_num-1]->ccode.get_bit_num();
+		for (len = 1; len <= maxbitsnum ; len++) {
+
+			//读取下一个bit
+			
+			int bit_value;
+			int ret = in.get_one_bit(bit_value);
+			if (ret) //bit流到底了,或者出错了
+			{
+				if (len == 1)
+				{
+					endflag = true;
+					break;
+				}
+				else//残留没有解码完的bit
+				{
+					return -2;
+				}
+			}
+					
+
+			if (bit_value)
+			{
+				code = code | 1;
+			}
+
+        
+			if (code - counts[len] < first)       /* if length len, return symbol */
+			{
+				
+				uint32_t sym = symbols[index + (code - first)];
+				out.put_one_symbol(sym);
+				break;
+				
+			}
+			index += counts[len];                 /* else update for next length */
+			first += counts[len];
+			first <<= 1;
+			code <<= 1;
+		}
+	}
+	
+	return 0;  
+	
+
+
+}
 int Huffman::serialize(unsigned char * buffer, uint32_t & buflen)
 {
 	//序列化的格式：叶子节点数 + [ 值 + 码字长度 ]
@@ -499,7 +618,7 @@ int Huffman::serialize(unsigned char * buffer, uint32_t & buflen)
 	int i;
 	for (i = 0; i < leaf_num; ++i)
 	{
-		*(uint32_t*)(buffer+offset) = leaf[i]->value;
+		*(uint32_t*)(buffer+offset) = leaf[i]->symbol;
 		offset += sizeof(uint32_t);
 
 		*(uint8_t*)(buffer+offset) = leaf[i]->ccode.get_bit_num();
@@ -526,14 +645,14 @@ int Huffman::deserialize(const unsigned char * buffer, uint32_t  buflen)
 	int offset = sizeof(uint32_t);
 	for (i = 0; i < leaf_num; ++i)
 	{
-		uint32_t value = *(uint32_t*)(buffer+offset);
+		uint32_t symbol = *(uint32_t*)(buffer+offset);
 		offset += sizeof(uint32_t);
 
 		uint8_t bitnum = *(uint8_t*)(buffer+offset);
 		offset += sizeof(uint8_t);
 
 		leaf[i] = new HuffmanItem();
-		leaf[i]->value = value;
+		leaf[i]->symbol = symbol;
 		leaf[i]->code.len = bitnum;// code不是完整的状态和数据，借用一下他的长度字段
 	}
 #if 0

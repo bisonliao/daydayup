@@ -11,6 +11,9 @@
 #include <stdint.h>
 #include <string>
 
+namespace bison
+{
+
 
 #define MAX_BITS_NUM (80)
 
@@ -38,7 +41,7 @@ class HuffmanItem
 {
 private:
 	
-	uint32_t value;//我认为要编码的实际数据，都可以用一个整数编号起来
+	uint32_t symbol;//我认为要编码的实际数据，都可以用一个整数编号起来
 	BitString code;	//该节点的huffman编码
 	BitString ccode; //该节点的范式huffman编码
 	uint32_t frequency;//出现频率
@@ -54,7 +57,7 @@ private:
 
 public:
 	HuffmanItem();
-	HuffmanItem(uint32_t value, uint32_t freq);//输入要编码的数据和它出现的频次
+	HuffmanItem(uint32_t symbol, uint32_t freq);//输入要编码的数据和它出现的频次
 	
 	virtual ~HuffmanItem();
 
@@ -62,6 +65,23 @@ public:
 	
 
 } ;
+
+//两个用来持续读写bit和symbol的接口定义
+//在处理很大的文件的时候，不希望全部加载到内存
+//而是使用流式的方式来读写bit和symbol，用户可
+//自定义读写类，继承这两个接口即可
+class InputStream
+{
+public:
+	virtual int get_one_symbol(uint32_t &symbol) = 0;//返回0表示成功，非0表示读完了
+	virtual int get_one_bit(int & bit) = 0;//返回0表示成功，非0表示读完了
+};
+class OutputStream
+{
+public:
+	virtual int put_one_symbol(uint32_t  symbol) = 0;//写，通常没人管你的返回结果 ：）
+	virtual int put_one_bit(int bit) = 0;
+};
 
 //哈夫曼编码
 class Huffman
@@ -73,17 +93,27 @@ private:
 	int canonicalize();//范式化，详细见范式哈夫曼
 	void print_leaf();//打印调试信息
 	void release_tree(HuffmanItem* root);//释放哈夫曼树，这棵树只是在编码过程中用一下，码字确定后就可以释放了
+
 public:
 	Huffman();
 	int build(const HuffmanItem items[], uint32_t item_num);//根据一系列值和他们的频次，建立范式哈夫曼
 	virtual ~Huffman();
+
 	int encode(const uint32_t values[], uint32_t val_num, 
 			unsigned char  bits[], uint32_t & bit_num);//对存储在values里的value_num个值，进行编码，bit存储到bits里
 	int decode(uint32_t values[], uint32_t &val_num, 
 			const unsigned char  bits[], uint32_t  bit_num);//反过来，解码
+	int encode(InputStream & in, OutputStream &out);
+	int decode(InputStream & in, OutputStream &out);
+
+
 	static void bits2string(const unsigned char  bits[], uint32_t  bit_num, std::string &s);//把bit数组以字符串方式表示出来
 	int serialize(unsigned char * buf, uint32_t & buflen);//把范式哈夫曼序列化，方便存储和传输
 	int deserialize(const unsigned char * buf, uint32_t  buflen);//反序列化
+
+};
+
+
 
 };
 

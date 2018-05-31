@@ -87,5 +87,5 @@ public:
 
 };
 
-
+int test(const char * filename);
 #endif

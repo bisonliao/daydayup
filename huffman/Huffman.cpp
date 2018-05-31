@@ -40,6 +40,10 @@ void BitString::push_back(unsigned char oneBit)
 	{
 		*ptr = *ptr | (1<<j);
 	}
+	else
+	{
+		*ptr = *ptr & (~(1<<j));
+	}
 	len++;
 }
 int BitString::read_bit(uint16_t index) const
@@ -327,6 +331,8 @@ void Huffman::print_leaf()
 
 int Huffman::canonicalize()
 {
+	//反正网上没有像样的资料把这个过程说清楚，我不太确定
+
 	if (leaf == NULL || leaf_num < 2) { return -1;}
 	qsort(leaf, leaf_num, sizeof(HuffmanItem*), HuffmanItem::item_cmp2);
 	
@@ -342,7 +348,11 @@ int Huffman::canonicalize()
 		bs.increase();//范式1
 		if (bs.get_bit_num() < leaf[index]->code.get_bit_num())//范式2
 		{
-			bs.push_back(0);
+			//这里是不是一直补0，我不确定，但一些测试用例可以通过，还需要继续找权威资料
+			while (bs.get_bit_num() < leaf[index]->code.get_bit_num())
+			{
+				bs.push_back(0);
+			}
 		}
 		leaf[index]->ccode = bs;
 	}
@@ -400,6 +410,7 @@ int Huffman::encode(const uint32_t values[], uint32_t val_num,
 int Huffman::decode(uint32_t values[], uint32_t &val_num, 
 			const unsigned char  bits[], uint32_t  bit_num)
 {
+	//反正网上没有像样的资料把这个过程说清楚，我不太确定
 	if (leaf == NULL || leaf_num < 2) { return -1;}
 	if (values == NULL || bits == NULL) { return -2;}
 	//leaf数组里的item，是按照码字长度升序排列的，相同长度的码字，
@@ -573,51 +584,93 @@ void Huffman::bits2string(const unsigned char  bits[], uint32_t  bit_num, string
 		}
 	}
 }
-int test()
+int test(const char * filename)
 {
-	srand(_getpid());
-	HuffmanItem items[5];
-	for (int i =0; i  < 5; ++i)
+	/////////////////////////////////////////
+	//把文件读进来，文件不要太大，不要超过10M
+	//然后压缩文件
+	if (filename == NULL) { return -1;}
+	int fd = open(filename, O_RDONLY);
+	if (fd < 0)
 	{
-		HuffmanItem a(i, i+1);
-		items[i] = a;
+		return -2;
 	}
-	Huffman hh, h;
-	hh.build(items, 5);
+	static unsigned char buffer[1024*1024*10];
+	static uint32_t uncompressed[1024*1024*10];
+	static unsigned char compressed[1024*1024*10];
+	uint32_t offset = 0;
+	while (offset < sizeof(buffer))
+	{
+		int len = read(fd, buffer+offset, sizeof(buffer)-offset);
+		if (len <= 0) { break;}
+		offset += len;
+	}
+	close(fd);
+	if (offset >= sizeof(buffer))
+	{
+		return -3;
+	}
+	printf("压缩前的数据长度:%d\n", offset);
+	int count[256];
+	int i;
+	memset(count, 0, sizeof(count));
+	for (i = 0; i < offset; ++i)
+	{
+		count[ buffer[i] ]++;
+		uncompressed[i] = buffer[i];//转为uint32_t型的value
+	}
 
-	unsigned char serialbuf[100];
+	HuffmanItem items[256];
+	int item_num = 0;
+	for (i =0; i  < 256; ++i)
+	{
+		if (count[i] != 0)
+		{
+		HuffmanItem a(i, count[i]);
+		items[item_num++] = a;
+		}
+	}
+	Huffman hh;
+	hh.build(items, item_num);
+
+	
+	uint32_t bitnum = sizeof(compressed)*8;
+
+	if (hh.encode(uncompressed, offset, 
+		     compressed, bitnum) < 0) { return -1;}
+	printf("压缩后的数据长度：%d bytes\n", bitnum / 8 + 1);
+
+	unsigned char serialbuf[8*256];
 	uint32_t serialbuflen = sizeof(serialbuf);
 	if (hh.serialize(serialbuf, serialbuflen)) { return -1;}
-	printf("序列化长度：%u\n", serialbuflen);
+	printf("哈夫曼编码本身序列化长度：%u\n", serialbuflen);
+	/////////////////////////////////////////////////////////
+	//前面完成了压缩
+	//下来尝试恢复和解压缩
+	////////////////////////////////////////////////////////
+
+	Huffman h;
 	if (h.deserialize(serialbuf, serialbuflen)) { return -1;}
 
+	memset(uncompressed, 0, sizeof(uncompressed));
+	memset(buffer, 0, sizeof(buffer));
+	offset = sizeof(uncompressed)/sizeof(uint32_t);
 
-
-	printf("原始串:\n");
-	uint32_t v[20];
-	for (int i =0; i  < sizeof(v)/sizeof(uint32_t); ++i)
+	if (h.decode(uncompressed, offset, compressed, bitnum)) { return -1;}
+	printf("解压缩获得数据长度:%d\n", offset);
+	
+	for (i = 0; i < offset; ++i)
 	{
-		v[i] = rand() % 5;
-		printf("%d", v[i]);
+		if (uncompressed[i] > 255) { printf("检测到异常数据!\n"); return -1;}
+		buffer[i] = uncompressed[i] & 0xff;
 	}
-	printf("\n");
+	char newfilename[255];
+	_snprintf(newfilename, sizeof(newfilename), "%s.recover", filename);
+	fd = open(newfilename, O_WRONLY|O_CREAT);
+	if (fd < 0) { perror("open"); return -1;}
+	if (write(fd, buffer, offset) != offset) { perror("write"); close(fd); return -1;};
+	close(fd);
 
-	unsigned char bits[100];
-	uint32_t bitnum = 800;
-	if (h.encode(v, sizeof(v)/sizeof(uint32_t), 
-		     bits, bitnum) < 0) { return -1;}
-	string s;
-	Huffman::bits2string(bits, bitnum, s);
-	printf(">>%d  %s\n", s.length(), s.c_str());
-
-	uint32_t vn = sizeof(v)/sizeof(uint32_t);
-	h.decode(v, vn, bits, bitnum);
-
-	printf("解码串:\n");
-	for (int i =0; i  < vn; ++i)
-	{
-		printf("%d", v[i]);
-	}
-	printf("\n");
+	return 0;
 }
 

@@ -2,21 +2,20 @@
  * bison 2018年写的一个huffman编码的库
  **/
 
-#include "StdAfx.h"
 #include "Huffman.h"
 
 #include <list>
-#include <hash_map>
 #include <map>
-#include <process.h>
+#include <vector>
 #include <stdio.h>
-#include <io.h>
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <unistd.h>
+#include <stdio.h>
 using namespace std;
 
-using namespace bison;
+//using namespace bison;
 
 
 BitString::BitString()
@@ -366,7 +365,7 @@ int Huffman::encode(const uint32_t values[], uint32_t val_num,
 	if (values == NULL || bits == NULL) { return -2;}
 
 	//建立方便速查的map，输入被编码的值，输出码字
-	hash_map<uint32_t, BitString> value2code;
+	map<uint32_t, BitString> value2code;
 	int i;
 	for (i = 0; i < leaf_num; ++i)
 	{
@@ -375,7 +374,7 @@ int Huffman::encode(const uint32_t values[], uint32_t val_num,
 	uint32_t bit_index = 0;
 	for (i = 0; i < val_num ; ++i)
 	{
-		hash_map<uint32_t, BitString>::iterator it  = value2code.find(values[i]);
+		map<uint32_t, BitString>::iterator it  = value2code.find(values[i]);
 		if (it == value2code.end())
 		{
 			return -3;
@@ -414,7 +413,7 @@ int Huffman::encode(InputStream & in, OutputStream & out)
 	
 
 	//建立方便速查的map，输入被编码的值，输出码字
-	hash_map<uint32_t, BitString> value2code;
+	map<uint32_t, BitString> value2code;
 	int i;
 	for (i = 0; i < leaf_num; ++i)
 	{
@@ -429,7 +428,7 @@ int Huffman::encode(InputStream & in, OutputStream & out)
 			break;
 		}
 
-		hash_map<uint32_t, BitString>::iterator it  = value2code.find(value);
+		map<uint32_t, BitString>::iterator it  = value2code.find(value);
 		if (it == value2code.end())
 		{
 			return -3;
@@ -454,8 +453,8 @@ int Huffman::decode(uint32_t values[], uint32_t &val_num,
 	if (values == NULL || bits == NULL) { return -2;}
 	//leaf数组里的item，是按照码字长度升序排列的，相同长度的码字，
 	// 按value的升序排列
-	vector<int> counts((size_t)(leaf_num), (int)0); //大小为leaf_num的数组，元素初始化为0
-	vector<uint32_t> symbols;
+	std::vector<int> counts((size_t)(leaf_num), (int)0); //大小为leaf_num的数组，元素初始化为0
+	std::vector<uint32_t> symbols;
 	int i;
 	for (i = 0; i < leaf_num; ++i)
 	{
@@ -784,7 +783,7 @@ int test(const char * filename)
 		buffer[i] = uncompressed[i] & 0xff;
 	}
 	char newfilename[255];
-	_snprintf(newfilename, sizeof(newfilename), "%s.recover", filename);
+	snprintf(newfilename, sizeof(newfilename), "%s.recover", filename);
 	fd = open(newfilename, O_WRONLY|O_CREAT);
 	if (fd < 0) { perror("open"); return -1;}
 	if (write(fd, buffer, offset) != offset) { perror("write"); close(fd); return -1;};

@@ -1,7 +1,10 @@
-#include "StdAfx.h"
 #include "BitmapPic.h"
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
+#include <vector>
+
+using namespace std;
 
 BitmapPic::BitmapPic(void)
 {
@@ -375,11 +378,11 @@ int BitmapPic::load(const char * filename)
 		modify_headers();
 	}
 	printf("pix count:%d\n", pixColors.size());
-	struct _stat64i32 stat;
-	_stat(filename, &stat);
-	if (stat.st_size != ftell(fp))
+	struct stat stt;
+	stat(filename, &stt);
+	if (stt.st_size != ftell(fp))
 	{
-		printf("没有读完，格式可能解释错误了!当前位置：%ld, 文件大小:%ld\n", ftell(fp), stat.st_size );
+		printf("没有读完，格式可能解释错误了!当前位置：%ld, 文件大小:%ld\n", ftell(fp), stt.st_size );
 		fclose(fp);
 		return 0;
 	}
@@ -387,7 +390,7 @@ int BitmapPic::load(const char * filename)
 	fclose(fp);
 	return 0;
 }
-int BitmapPic::get_pix(PixColor&p, uint32_t line, uint32_t col)
+int BitmapPic::get_pix(PixColor&p, uint32_t line, uint32_t col) const
 {
 	
 	if (line >= infoHeader.biHeight || col >= infoHeader.biWidth)
@@ -397,7 +400,7 @@ int BitmapPic::get_pix(PixColor&p, uint32_t line, uint32_t col)
 	p= pixColors[ line * infoHeader.biWidth + col];
 	return 0;
 }
-int BitmapPic::dump(const char * filename)
+int BitmapPic::dump(const char * filename) const
 {
 	if (filename == NULL) { return 1;}
 

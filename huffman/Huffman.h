@@ -11,8 +11,8 @@
 #include <stdint.h>
 #include <string>
 
-namespace bison
-{
+//namespace bison
+//{
 
 
 #define MAX_BITS_NUM (80)
@@ -115,7 +115,7 @@ public:
 
 
 
-};
+//};
 
 int test(const char * filename);
 #endif

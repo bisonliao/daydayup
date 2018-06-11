@@ -1,9 +1,11 @@
-#include "StdAfx.h"
 #include "CompressedPic.h"
+#include <math.h>
+
 
 
 BlockPic::BlockPic(void)
 {
+	QP = 8;
 }
 
 
@@ -26,7 +28,7 @@ static void YUV2RGB(uint8_t  Y, uint8_t U, uint8_t V, PixColor &pc)
 
 
 
-static void dct(const block1_t &b1, block2_t & b2)
+void BlockPic::dct(const block1_t &b1, block2_t & b2)
 {
 	int u, v, x, y;
 	block2_t g;
@@ -64,11 +66,16 @@ static void dct(const block1_t &b1, block2_t & b2)
 	{
 		for (v = 0; v < 8; ++v)
 		{
-			b2.values[u][v] = G[u][v] /  QMatrix[u][v];
+			//b2.values[u][v] = G[u][v] /  QMatrix[u][v];
+			b2.values[u][v] = G[u][v] / QP; 
 		}
 	}
 }
-static void inverse_dct(block1_t &b1, const block2_t & b2)
+void BlockPic::set_qp(uint8_t qp)
+{
+	QP = qp;
+}
+void BlockPic::inverse_dct(block1_t &b1, const block2_t & b2)
 {
 
 	int u, v, x, y;
@@ -79,7 +86,8 @@ static void inverse_dct(block1_t &b1, const block2_t & b2)
 	{
 		for (v = 0; v < 8; ++v)
 		{
-			F[u][v] = b2.values[u][v] * QMatrix[u][v];
+			//F[u][v] = b2.values[u][v] * QMatrix[u][v];
+			F[u][v] = b2.values[u][v] * QP;
 			
 
 		}
@@ -425,10 +433,11 @@ int BlockPic::to_bitmap(BitmapPic & bmp)
 	return 0;
 }
 
-void test()
+void BlockPic::test()
 {
 	block1_t b;
 	int i, j;
+	BlockPic bpic;
 	uint8_t buffer[][8] = {
 							52, 55, 61, 66, 70, 61, 64, 73,
 							63, 59, 55, 90, 109, 85,69,72,
@@ -441,39 +450,55 @@ void test()
 							};
 	memcpy(&b.values[0][0], buffer, sizeof(buffer));
 
-	printf("dct之前：\n");
-	for (i = 0; i < 8; ++i)
+	int r;
+	for (r = 0; r < 2; ++r)
 	{
-		for (j = 0; j < 8; ++j)
+		printf("\ndct之前：\n");
+		for (i = 0; i < 8; ++i)
 		{
-			printf("%d ", b.values[i][j]);
+			for (j = 0; j < 8; ++j)
+			{
+				printf("%d ", b.values[i][j]);
+			}
+			printf("\n");
 		}
-		printf("\n");
+
+		block2_t b2;
+		bpic.dct(b, b2);
+		printf("\ndct之后\n");
+		for (i = 0; i < 8; ++i)
+		{
+			for (j = 0; j < 8; ++j)
+			{
+				printf("%d ", b2.values[i][j]);
+			}
+			printf("\n");
+		}
+		bpic.inverse_dct(b, b2);
+		printf("\nidct后：\n");
+		for (i = 0; i < 8; ++i)
+		{
+			for (j = 0; j < 8; ++j)
+			{
+				printf("%d ", b.values[i][j]);
+			}
+			printf("\n");
+		}
+
+		for (i = 0; i < 8; ++i)
+		{
+			for (j = 0; j < 8; ++j)
+			{
+				b.values[i][j] = b.values[i][j] >> 2;
+			}
+			
+		}
+
 	}
 
-	block2_t b2;
-	dct(b, b2);
-	printf("dct之后\n");
-	for (i = 0; i < 8; ++i)
-	{
-		for (j = 0; j < 8; ++j)
-		{
-			printf("%d ", b2.values[i][j]);
-		}
-		printf("\n");
-	}
-	inverse_dct(b, b2);
-	printf("idct后：\n");
-	for (i = 0; i < 8; ++i)
-	{
-		for (j = 0; j < 8; ++j)
-		{
-			printf("%d ", b.values[i][j]);
-		}
-		printf("\n");
-	}
 
 
+	/*
 	printf("\n");
 	PixColor pc;
 	pc.B = 127;
@@ -485,5 +510,17 @@ void test()
 	printf("YUV:%d, %d, %d\n", Y, U, V);
 	YUV2RGB(Y, U, V, pc);
 	printf("BGR:%d %d %d\n", pc.B, pc.G, pc.R);
+	*/
+	/*
+	mpz_t t;
+	char tmp[512]={0};
+	mpz_init(t);
+	mpz_set_str(t, "0123456789", 10);
+	mpz_out_str(stdout, 2, t);
+	mpz_tstbit(t, 1);
+	gmp_fprintf(stdout, "\n%Zd\n",t);
+	mpz_export(tmp, NULL, 1, 1, 1, 0, t);
+	mpz_clear(t);
+	*/
 
 }

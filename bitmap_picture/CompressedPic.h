@@ -4,8 +4,6 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-#include<windows.h>
-#include <WinGDI.h>
 #include <deque>
 #include <vector>
 #include "BitmapPic.h"
@@ -20,7 +18,7 @@ typedef struct
 
 typedef struct
 {
-	int8_t values[8][8];
+	int16_t values[8][8];
 } block2_t; // 8*8µÄblock
 
 
@@ -53,14 +51,19 @@ private:
 	deque<block2_t> Y;
 	deque<block2_t> U;
 	deque<block2_t> V;
+	uint8_t QP;
 	
 
 public:
 	BlockPic(void);
+	void set_qp(uint8_t qp);
 	virtual ~BlockPic(void);
 	int from_bitmap(const BitmapPic & bmp);
 	int to_bitmap(BitmapPic & bmp);
+	static void test();
+	void inverse_dct(block1_t &b1, const block2_t & b2);
+	void dct(const block1_t &b1, block2_t & b2);
 };
 
-void test();
+
 

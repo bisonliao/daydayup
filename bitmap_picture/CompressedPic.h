@@ -18,7 +18,7 @@ typedef struct
 
 typedef struct
 {
-	int16_t values[8][8];
+	int8_t values[8][8];
 } block2_t; // 8*8µÄblock
 
 
@@ -47,11 +47,22 @@ const int QMatrix[8][8] = {
 class BlockPic
 {
 private:
+
 	BlockPicInfoHeader infoHeader;
 	deque<block2_t> Y;
 	deque<block2_t> U;
 	deque<block2_t> V;
 	uint8_t QP;
+
+
+	static double A[8][8];
+	static double A_transposed[8][8];
+
+	static void get_coeff(double A[][8]);
+	static void transpose(double A[][8]);
+	static void matrix_mul(double A[][8], double B[][8], double result[][8]);
+//	static void int_array_to_double(const int A[][8], double B[][8]);
+//	static void double_array_to_int(const double A[][8], int B[][8]);
 	
 
 public:
@@ -60,10 +71,20 @@ public:
 	virtual ~BlockPic(void);
 	int from_bitmap(const BitmapPic & bmp);
 	int to_bitmap(BitmapPic & bmp);
-	static void test();
 	void inverse_dct(block1_t &b1, const block2_t & b2);
+	//void inverse_dct2(block1_t &b1, const block2_t & b2);
 	void dct(const block1_t &b1, block2_t & b2);
+	//void dct2(const block1_t &b1, block2_t & b2);
+
+	static const double Pi = 3.1415926535;
+
+	static void test();
+
+
+
+	friend class InitCodeHelper;
 };
+
 
 
 

@@ -1,0 +1,25 @@
+<component name="libraryTable">
+  <library name="external_libs">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/web/WEB-INF/lib/commons-compress-1.8.jar!/" />
+      <root url="jar://$PROJECT_DIR$/web/WEB-INF/lib/commons-fileupload-1.2.2.jar!/" />
+      <root url="jar://$PROJECT_DIR$/web/WEB-INF/lib/commons-io-2.4.jar!/" />
+      <root url="jar://$PROJECT_DIR$/web/WEB-INF/lib/jackson-all-1.6.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/web/WEB-INF/lib/javax.servlet-api-3.1.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/web/WEB-INF/lib/jcommon-1.0.21.jar!/" />
+      <root url="jar://$PROJECT_DIR$/web/WEB-INF/lib/jfreechart-1.0.18.jar!/" />
+      <root url="jar://$PROJECT_DIR$/web/WEB-INF/lib/junit-4.12.jar!/" />
+      <root url="jar://$PROJECT_DIR$/web/WEB-INF/lib/log4j-1.2.17.jar!/" />
+      <root url="jar://$PROJECT_DIR$/web/WEB-INF/lib/mysql-connector-java-5.1.38-bin.jar!/" />
+      <root url="jar://$PROJECT_DIR$/web/WEB-INF/lib/org.json.jar!/" />
+      <root url="jar://$PROJECT_DIR$/web/WEB-INF/lib/protobuf-java-2.6.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/web/WEB-INF/lib/scf4j-props-1.0.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/web/WEB-INF/lib/slf4j-api-1.7.18.jar!/" />
+      <root url="jar://$PROJECT_DIR$/web/WEB-INF/lib/zookeeper-3.4.8.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/web/WEB-INF/lib/zookeeper-3.4.8.jar!/" />
+    </SOURCES>
+  </library>
+</component>

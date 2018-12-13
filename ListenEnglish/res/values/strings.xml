@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ListenEnglish</string>
+
+
+
+    <integer name="MSGID_CHECK_TIME">21</integer>
+    <integer name="MSGID_UPDATE_TITLES">22</integer>
+    <integer name="MSGID_PLAY_URL">23</integer>
+
+</resources>

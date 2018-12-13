@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:orientation="vertical"
+              android:layout_width="fill_parent"
+              android:layout_height="fill_parent"
+        >
+
+    <RelativeLayout
+            android:id="@+id/loadingPanel"
+            android:layout_width="match_parent"
+            android:layout_height="200px"
+            android:visibility="gone"
+            android:gravity="center" >
+
+        <ProgressBar
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:indeterminate="true" />
+    </RelativeLayout>
+
+    <ListView
+            android:layout_width="match_parent"
+            android:layout_height="300dp"
+            android:id="@+id/FileListView" android:divider="#EEEEEEEE" android:dividerHeight="1dp"
+            android:choiceMode="singleChoice" android:drawSelectorOnTop="true" android:fastScrollEnabled="true"
+            android:fastScrollAlwaysVisible="false"/>
+
+
+    <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="             "
+            android:id="@+id/textView"/>
+    <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="fill_parent"
+            android:layout_height="60dp" android:visibility="visible">
+        <Button
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="&lt;&lt;"
+                android:id="@+id/btn_prev" android:onClick="onButtonClicked"/>
+        <Button
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="&lt;"
+                android:id="@+id/btn_back" android:visibility="visible" android:onClick="onButtonClicked"/>
+        <Button
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="play"
+                android:id="@+id/btn_play" android:onClick="onButtonClicked"/>
+        <Button
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=">"
+                android:id="@+id/btn_forward" android:onClick="onButtonClicked"/>
+        <Button
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=">>"
+                android:id="@+id/btn_next" android:onClick="onButtonClicked"/>
+
+
+    </LinearLayout>
+    <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="fill_parent"
+            android:layout_height="50dp">
+        <ProgressBar
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="200dp"
+                android:layout_height="wrap_content"
+                android:id="@+id/progressBar" android:max="500"
+                />
+        <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="            "
+                android:id="@+id/textView2"/>
+        <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/TxtVw_Progress" android:layout_gravity="center_horizontal|right"/>
+    </LinearLayout>
+    <TextView
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/txtVw_ShowFileName" android:layout_gravity="left|center_horizontal"/>
+    <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="fill_parent"
+            android:layout_height="50dp">
+<!--
+        <ToggleButton android:layout_width="wrap_content" android:layout_height="wrap_content"
+                      android:textOn="using cpp server"
+                      android:textOff="using java server"
+                      android:id="@+id/btn_lang"  android:onClick="onButtonClicked"/>
+                      -->
+
+        <ToggleButton android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textOn="单曲循"
+                android:textOff="单曲循"
+                android:id="@+id/btn_repeat"/>
+        <ToggleButton
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="跟读"
+                android:id="@+id/btn_follow" android:textOff="跟读" android:textOn="跟读"/>
+        <Button
+                style="?android:attr/buttonStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="加断句"
+                android:id="@+id/btn_brk" android:onClick="onButtonClicked"/>
+        <Button
+                style="?android:attr/buttonStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="清断句"
+                android:id="@+id/btn_clrbrk" android:onClick="onButtonClicked"/>
+    </LinearLayout>
+
+
+</LinearLayout>
+

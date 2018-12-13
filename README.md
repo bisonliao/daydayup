@@ -10,3 +10,4 @@
 * matlab_codec 使用matlab编解码图片和视频
 * normally_distributed 产生正态分布随机数的方法
 * web_mis_base 一个web的信息管理系统的开发雏形，使用ajax等技术
+* ListenEnglish 一个学习英语用的安卓app，方便自己设置断句和跟读

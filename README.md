@@ -11,3 +11,4 @@
 * normally_distributed 产生正态分布随机数的方法
 * web_mis_base 一个web的信息管理系统的开发雏形，使用ajax等技术，InteliJ工程
 * ListenEnglish 一个学习英语用的安卓app，方便自己设置断句和跟读,InteliJ工程
+* PCMPlayer 使用AudioTrack和AudioRecord组件录制和播放PCM数据的例子，InteliJ工程

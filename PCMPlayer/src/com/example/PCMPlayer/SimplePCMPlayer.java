@@ -54,9 +54,6 @@ public class SimplePCMPlayer {
     }
 
 
-    public int write(byte[] buffer, int offset, int length) {
-        return mAudioTrack.write(buffer,offset,length);
-    }
     public int write(short[] buffer, int offset, int length){return mAudioTrack.write(buffer, offset, length);}
 
     public void stop() {
@@ -65,15 +62,5 @@ public class SimplePCMPlayer {
         }
     }
 
-    public int getSampleRate() {
-        return mSampleRate;
-    }
-
-    public AudioTrack getAudioTrack() {
-        return mAudioTrack;
-    }
-
-    public int getMinBufferSize() {
-        return minBufferSize;
-    }
+    
 }

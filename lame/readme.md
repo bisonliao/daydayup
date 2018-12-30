@@ -12,6 +12,28 @@
 
 ![](DPCM1.jpg)
 
+下面是产生上述pcm数据差值的mathematica代码，当然，检查他们的分布，还借助了minitab软件：
+
+	pcm = Import["d:\\005.mp3"]；
+	ch = pcm[[1]][[1]][[1]];
+	sr = pcm[[1]][[2]];
+	sr
+	len = Length[ch];
+	
+	Do[
+		 start = RandomInteger[{1, len - sr}];
+		 filename = "d:\pcm_" <> ToString[start] <> ".txt";
+		 fd = OpenWrite[filename];
+		 Write[fd, "pcm_" <> ToString[start]];
+		 Do[
+			  Write[fd, 
+			   Round[ch[[start + i]]*37767] - Round[ch[[start + i - 1]]*37767 ]],
+			  {i, 2, sr}
+		  ];
+		 Close[fd],
+		 {j, 1, 10}
+	 ]
+
 我设计一个DPCM压缩格式，代码在my_codec.c中，协议如下：
 
 1. 每一秒的pcm作为一帧，一个音频文件由多个帧组成

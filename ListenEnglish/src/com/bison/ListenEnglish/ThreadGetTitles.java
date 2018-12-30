@@ -12,7 +12,7 @@ import android.widget.ListView;
 import android.widget.Toast;
 
 
-import java.io.File;
+import java.io.*;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Created by Administrator on 2016/5/6.
@@ -33,6 +34,33 @@ public class ThreadGetTitles implements Runnable {
     {
         mainActivity = a;
         handler = h;
+    }
+    List<Integer> loadBreakInfo(String filename)
+    {
+        String rootdir = Environment.getExternalStorageDirectory().getAbsolutePath();
+
+        String audiodir = rootdir + "/ListenEnglish";
+        String brkFile = audiodir + "/"+filename+".brk";
+        List<Integer> intList = new ArrayList<>();
+
+        try {
+            Log.d("bison", "try to open "+brkFile);
+            BufferedReader r = new BufferedReader(new FileReader(brkFile));
+
+            String  line = null;
+
+            while ( (line = r.readLine()) != null) {
+                intList.add(new Integer(line));
+                Log.d("bison", "I read break point:"+line);
+            }
+            r.close();
+        }
+        catch (Exception e)
+        {
+            Log.e("bison", e.getMessage());
+        }
+        return intList;
+
     }
     @Override
     public void run() {
@@ -52,21 +80,38 @@ public class ThreadGetTitles implements Runnable {
              throw new Exception(audiodir+" is no a directory");
          }
          String[] filelist = f.list();
-         Log.d("", "" +f.list().length);
-            mainActivity.m_titles = new String[filelist.length];
+         Log.d("", "" + f.list().length);
+         int mp3fileCnt = 0;
+         for (int i = 0; i < filelist.length; ++i) {
+             if (filelist[i].length() > 4 && (filelist[i].endsWith(".mp3") || filelist[i].endsWith(".MP3"))) {
+                 mp3fileCnt++;
+             }
+         }
+         if (mp3fileCnt < 1)
+         {
+             return;
+         }
+         mainActivity.m_titles = new String[mp3fileCnt];
          SharedPreferences sp = mainActivity.getSharedPreferences("breakpoints", MainActivity.MODE_PRIVATE);
 
-
+            int mp3Index = 0;
             for (int i = 0; i < filelist.length; ++i)
             {
+                if (filelist[i].length() > 4 && (filelist[i].endsWith(".mp3")||filelist[i].endsWith(".MP3") ))
+                {
 
-                mainActivity.m_titles[i] = filelist[i];
+                    mainActivity.m_titles[mp3Index++] = filelist[i];
+                /*
 
-                Set<String> strset = sp.getStringSet(mainActivity.m_titles[i], new HashSet<String>());
+                    Set<String> strset = sp.getStringSet(mainActivity.m_titles[i], new HashSet<String>());
 
-                Log.d("bison", "get strin set for "+mainActivity.m_titles[i]+", size:"+strset.size());
-                List<Integer> intlist = MainActivity.strSet2IntList(strset);
-                mainActivity.m_brkpoints.put(mainActivity.m_titles[i], intlist);
+                    Log.d("bison", "get strin set for " + mainActivity.m_titles[i] + ", size:" + strset.size());
+                    List<Integer> intlist = MainActivity.strSet2IntList(strset);
+                    mainActivity.m_brkpoints.put(mainActivity.m_titles[i], intlist);
+                    */
+                    List<Integer> intlist = loadBreakInfo(filelist[i]);
+                    mainActivity.m_brkpoints.put(mainActivity.m_titles[i], intlist);
+                }
 
             }
 

@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.media.MediaPlayer;
+import android.media.PlaybackParams;
 import android.net.Uri;
 import android.os.*;
 import android.util.Log;
@@ -43,6 +44,7 @@ public class MainActivity extends Activity {
     private Date m_timeToExit = null;
     protected Map<String,List<Integer> > m_brkpoints = new HashMap<String,List<Integer>>();
     protected int m_lastbrk = 0;//最后一次断句的位置
+    protected float m_speed = 1.0f;
 
     private MainActivityHandler m_handler = new MainActivityHandler();
     @Override
@@ -185,6 +187,7 @@ public class MainActivity extends Activity {
                 ListView lv = (ListView)(MainActivity.this.findViewById(R.id.FileListView));
 
                 ArrayAdapter<String> ad = new ArrayAdapter<String>(MainActivity.this, android.R.layout.simple_list_item_1, m_titles);
+                Log.d("bison", "file list length:"+m_titles.length);
                 lv.setAdapter(ad);
             }
             if (msg.what == R.integer.MSGID_PLAY_URL)
@@ -192,6 +195,15 @@ public class MainActivity extends Activity {
                 findViewById(R.id.loadingPanel).setVisibility(View.GONE);
                 try {
                     m_player.setDataSource(m_urlToPlay);
+                    ToggleButton toggleButton = (ToggleButton)(findViewById(R.id.btn_slow));
+                    if (toggleButton.isChecked())
+                    {
+                        PlaybackParams params = m_player.getPlaybackParams();
+                        params.setSpeed(0.75f);
+                        m_player.setPlaybackParams(params);
+                    }
+
+
                     m_player.prepare();
                     m_player.start();
 
@@ -328,6 +340,7 @@ public class MainActivity extends Activity {
         {
             pauseOrContinue();
         }
+
         if (v.getId() == R.id.btn_back)
         {
             if (m_player != null) {
@@ -358,46 +371,8 @@ public class MainActivity extends Activity {
                 }
             }
         }
-        if (v.getId() == R.id.btn_brk)
-        {
-            if (m_player != null) {
-                if (m_player.isPlaying() ) {
-                    int curPos = m_player.getCurrentPosition();
-                    List<Integer> brklist = m_brkpoints.get(m_titles[m_currentFilePos]);
-                    if (brklist == null) {
-                        brklist = new ArrayList<>();
-                        m_brkpoints.put(m_titles[m_currentFilePos], brklist);
-                        Log.d("bison", "new break list for "+m_titles[m_currentFilePos]);
-                    }
-                    brklist.add(new Integer(curPos));
-                    Collections.sort(brklist);
-                    //Log.d("bison", "add break point at "+curPos+" for "+m_titles[m_currentFilePos]);
-                }
-            }
-
-        }
-        if (v.getId() == R.id.btn_clrbrk)
-        {
-            if (m_player != null) {
-                if (m_player.isPlaying() || m_isPaused )
-                {
-                    new AlertDialog.Builder(this)
-                            .setTitle("删除确认")
-                            .setMessage("确定删除当前mp3的断句信息吗？")
-                            .setPositiveButton("是", new DialogInterface.OnClickListener() {
-                                public void onClick(DialogInterface dialog, int which) {
-                                    MainActivity.this.m_brkpoints.put(m_titles[m_currentFilePos], new ArrayList<Integer>());
-                                }
-
-                            })
-                            .setNegativeButton("否", null)
-                            .show();
 
 
-                }
-            }
-
-        }
         if (v.getId() == R.id.btn_forward)
         {
             if (m_player != null) {
@@ -478,7 +453,7 @@ public class MainActivity extends Activity {
             m_player = null;
         }
         Log.d("bison", "saving break points...");
-
+/*
         SharedPreferences sp = this.getSharedPreferences("breakpoints", MODE_PRIVATE);
         SharedPreferences.Editor editor = sp.edit();
         for (String key:m_brkpoints.keySet())
@@ -490,6 +465,7 @@ public class MainActivity extends Activity {
 
         }
         editor.commit();
+        */
     }
     public static Set<String> intList2StrSet(List<Integer> intlist)
     {

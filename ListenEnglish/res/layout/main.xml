@@ -22,7 +22,9 @@
             android:layout_width="match_parent"
             android:layout_height="300dp"
             android:id="@+id/FileListView" android:divider="#EEEEEEEE" android:dividerHeight="1dp"
-            android:choiceMode="singleChoice" android:drawSelectorOnTop="true" android:fastScrollEnabled="true"
+            android:choiceMode="singleChoice"
+            android:drawSelectorOnTop="true"
+            android:fastScrollEnabled="true"
             android:fastScrollAlwaysVisible="false"/>
 
 
@@ -107,18 +109,11 @@
                 android:layout_height="wrap_content"
                 android:text="跟读"
                 android:id="@+id/btn_follow" android:textOff="跟读" android:textOn="跟读"/>
-        <Button
-                style="?android:attr/buttonStyleSmall"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="加断句"
-                android:id="@+id/btn_brk" android:onClick="onButtonClicked"/>
-        <Button
-                style="?android:attr/buttonStyleSmall"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="清断句"
-                android:id="@+id/btn_clrbrk" android:onClick="onButtonClicked"/>
+
+        <ToggleButton android:layout_width="wrap_content" android:layout_height="wrap_content"
+                      android:textOn="慢速"
+                      android:textOff="慢速"
+                      android:id="@+id/btn_slow"/>
     </LinearLayout>
 
 

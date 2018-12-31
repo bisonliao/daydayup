@@ -147,15 +147,11 @@ int DM_decode_frame(int fd, uint32_t *sample_rate, uint8_t *channel_num, short p
 				prev = pcm[2*i];
 
 				delta = (code & 0x07) ;
-				neg = (code & 0x08);
+				neg = (code & 0x08)>>3;
 				if (neg) { delta = -delta;}
 				pcm[2*i+1] = delta*head.step_size[j] + prev;
 				prev = pcm[2*i+1];
 
-				/*
-				printf("#%d:%d\n", j, pcm[2*i]);
-				printf("#%d:%d\n", j, pcm[2*i+1]);
-				*/
 			}
 		}
 
@@ -291,10 +287,11 @@ int DM_encode_frame(uint32_t sample_rate, uint8_t channel_num,
 			offset++;
 			int neg1 = 0, neg2 = 0;
 
-			int delta1 = (pcm[i][j]-prev) / head->step_size[i];
+			int delta1 = (pcm[i][j]-prev ) / head->step_size[i];
 
 			if (delta1 < 0) {neg1 = 1; delta1 = -delta1;}
 			if (delta1 > 7) { delta1 = 7; overflow++;}
+		
 
 			prev = prev + delta1 *pow(-1, neg1)* head->step_size[i];
 
@@ -322,8 +319,8 @@ int DM_encode_frame(uint32_t sample_rate, uint8_t channel_num,
 
 int comp_float_by_abs(const void * a, const void * b)
 {
-	float aabs = abs( *(float*)a );
-	float babs = abs( *(float*)b );
+	short aabs = abs( *(short*)a );
+	short babs = abs( *(short*)b );
 	if (aabs < babs ) { return 1;}
 	if (aabs > babs ) { return -1;}
 	return 0;
@@ -341,27 +338,54 @@ double ialaw(double x)
 int analyze_distribute(const short pcm[], uint32_t pcm_len, uint16_t * step_size)
 {
 	int i;
-	float delta[pcm_len];
+	short delta[pcm_len];
 	
 
 	delta[0] = 0;
+	double sum = abs(pcm[0]);
+	int count = 1;
 	for (i = 1; i < pcm_len; ++i)
 	{
 		delta[i] = pcm[i] - pcm[i-1];
+		if (pcm[i] != 0)
+		{
+			sum += abs(pcm[i]);
+			count++;
+		}
 	}
-	qsort(delta, pcm_len, sizeof(float), comp_float_by_abs);
+	double avg = sum / count;
+	if (avg < 0.0000001) { avg = 1.0;}
+
+	qsort(delta, pcm_len, sizeof(short), comp_float_by_abs);
+	
+/*
+	printf("vvv:");
+	for (i = 0; i < 12; ++i)
+	{
+		printf("%d ", delta[i]);
+	}
+	for (i = 12; i > 0; --i)
+	{
+		printf("%d ", delta[pcm_len-1-i]);
+	}
+	printf("\n");
+*/
 
 
-	int outnum = (pcm_len) * 0.07;
+	int outnum = (pcm_len) * 0.05;
 	
-	float cut = delta[outnum];
+	short cut = delta[outnum];
+
 	
 	
-	*step_size = (abs(cut)) / 7;
+	*step_size = round((abs(cut)) / 7.0);
 	if (*step_size == 0)
 	{
 		*step_size = 1;
 	}
+	printf("cut:%d, avg_abs:%.2f, step_size:%d, step_size/avg_abs:%.2f\%\n", 
+		abs(cut), avg, *step_size, *step_size * 100/ avg);
+	return 0;
 }
 
 int load_pcm_from_mp3(const char * filename)
@@ -521,6 +545,7 @@ int main(int argc, char **argv)
 	if (argc < 2)
 	{
 		printf("usage: %s encode pcm_l_file pcm_r_file  save_file\n", argv[0]);
+		printf("   or: %s test  mp3file\n", argv[0]);
 		return 0;
 	}
 	if (strcmp(argv[1], "encode") == 0 && argc >= 5)

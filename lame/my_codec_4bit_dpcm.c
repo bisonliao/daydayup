@@ -326,14 +326,6 @@ int comp_float_by_abs(const void * a, const void * b)
 	return 0;
 }
 
-double alaw(double x)
-{
-	return log(1+255.0*x) / log(256.0);	
-}
-double ialaw(double x)
-{
-	return (pow(2.718281828, log(256.0)*x)-1)/255.0;
-}
 
 int analyze_distribute(const short pcm[], uint32_t pcm_len, uint16_t * step_size)
 {
@@ -445,8 +437,8 @@ int load_pcm_from_mp3(const char * filename)
 		{
 			break;
 		}
-		memcpy(g_pcm_data.pcm_l+g_pcm_data.pcm_len, pcm_l, len);
-		memcpy(g_pcm_data.pcm_r+g_pcm_data.pcm_len, pcm_r, len);
+		memcpy(g_pcm_data.pcm_l+g_pcm_data.pcm_len, pcm_l, len*sizeof(short));
+		memcpy(g_pcm_data.pcm_r+g_pcm_data.pcm_len, pcm_r, len*sizeof(short));
 		g_pcm_data.pcm_len += len;
 
 		if (flag && mp3header.header_parsed)
@@ -542,29 +534,23 @@ clean:
 
 int main(int argc, char **argv)
 {
-	if (argc < 2)
+	if (argc < 3)
 	{
-		printf("usage: %s encode pcm_l_file pcm_r_file  save_file\n", argv[0]);
-		printf("   or: %s test  mp3file\n", argv[0]);
+		printf("usage:%s sourcefile.mp3  destfile.mp3\n",  argv[0]);
+		printf("%s will:\n", argv[0]);
+		printf("step1:load pcm from source file\n");
+		printf("step2:encode pcm use my dpcm codec to bison.data\n");
+		printf("step3:decode pcm use my dpcm codec from bison.data\n");
+		printf("step4:save pcm to destfile.mp3\n");
 		return 0;
 	}
-	if (strcmp(argv[1], "encode") == 0 && argc >= 5)
-	{
-		/*
-		int l = load_pcm(argv[2], g_pcm_l, sizeof(g_pcm_l)/sizeof(short) );
-		int r = load_pcm(argv[3], g_pcm_r, sizeof(g_pcm_r)/sizeof(short) );
-		if (l != r) { return 0;}
 
-		return DM_encode(44100, 2, g_pcm_l, g_pcm_r, l, argv[4]);
-		*/
-	}
-	if (strcmp(argv[1], "test") == 0 && argc >= 3)
 	{
 		// load pcm from mp3
 		g_pcm_data.pcm_len = 0;
 		g_pcm_data.sample_rate = 0;
 		g_pcm_data.channel_num = 0;
-		int iRet = load_pcm_from_mp3(argv[2]);
+		int iRet = load_pcm_from_mp3(argv[1]);
 		if (iRet  < 0)
 		{
 			printf("load_pcm_from_mp3 return %d\n", iRet);
@@ -594,14 +580,10 @@ int main(int argc, char **argv)
 		}
 
 		// save to mp3 file
-		iRet = save_pcm_to_mp3("./bison.mp3");
+		iRet = save_pcm_to_mp3(argv[2]);
 		printf("save_pcm_to_mp3 return %d\n", iRet);
 
-
-
 	}
-	
-
 
 	return 0;
 }

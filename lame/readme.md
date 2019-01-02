@@ -33,27 +33,132 @@
 
 ## step2：设计与实现 ##
 
-我设计一个DPCM压缩格式，代码在my_codec.c中，协议如下：
+我设计一个DPCM压缩格式，代码在my_codec_4bit_dpcm.c中，协议如下：
 
 1. 每一秒的pcm作为一帧，一个音频文件由多个帧组成
 2. 每帧由帧头和数据部分组成
 3. 每帧的帧头保存采样率、声道数、量化步长、该帧的第一个采样值(16bit)等基础信息
 4. 每帧的数据部分，保存相邻采样间差值，即每个PCM与前一个PCM的差值。该差值是一个4bit的商，即pcm差值除以量化步长所得的商，可正可负。
 
-测试后发现，音频的还原效果较差，很多语音句子都听不清了。不出所料，毕竟很多帧的量化步长达到了100甚至更大，量化误差占信号值本身的百分比达到18%：
+测试后发现，音频的还原效果挺好的。
 
-	...
-	cut:4223, avg_abs:3292.07, step_size:603, step_size/avg_abs:18.32%
-	cut:2558, avg_abs:3505.46, step_size:365, step_size/avg_abs:10.41%
-	cut:1129, avg_abs:1059.11, step_size:161, step_size/avg_abs:15.20%
-	cut:650, avg_abs:1915.04, step_size:93, step_size/avg_abs:4.86%
-	cut:1727, avg_abs:1867.59, step_size:247, step_size/avg_abs:13.23%
-	...
+同样的，我也试了一下：
 
-是不是减小帧的大小，例如每个帧处理1000个连续采样值，可以非常有效的减少差值呢？  答案是否定的：
+1. 用8bit来编码相邻两个采样的差值，代码在my_codec_8bit_dpcm.c中
+2. 用8bit来编码每个采样的值，代码在my_codec_8bit_pcm.c中
 
-![](DPCM2.jpg)
+还原的音质都还可以。
 
-真不知道DM编码方式是怎么用一个bit来表示差值的，不会引入很大的量化误差吗？ 或者需要非常非常高的采样频率，以减小相邻两个采样的差值。
+## step3:非均匀量化 ##
 
-看来，我只好增加每个差值的位宽了。
+准备采用mu律或者A律做进一步的非均匀量化，优化信噪比。
+
+假设将0-32767范围的值，先经过mulaw映射到0-32767范围，然后量化到0-127之间的值。
+
+我发现mu律对于大多数绝对值小的信号，可以有更好的信噪比，但对于个别的小信号，比均匀编码更差。
+
+一开始我以为是我的公式不对，但参考wiki上的分段查表法也是一样的结果：
+
+	alaw[x_]:= Log[1+255(x/32767)]/Log[1+255] * 32767;
+	ialaw[x_]:= (Exp[x/32767*Log[1+255]]-1)/255*32767;
+	Plot[{alaw[x], ialaw[x],x}, {x, 0, 32767}]
+
+	answer = Solve[alaw'[x] ==1];
+	x0=answer[[1]][[1]][[2]];
+	Print[N[x0]]; (* x0 is seperated point*)
+
+	ok = 0;
+	Do[
+		value=i;
+		err1 = Abs[value - Round[value/64]*64];
+		err2 =Abs[value - ialaw[Round[alaw[value]/64]*64]];
+		If[err1>err2, ok=ok+1, null],
+		{i, 0, Floor[x0]}
+	];
+	Print["ok=", ok, ",  ", N[ok/x0]]
+
+![](mulaw.jpg)
+
+可以看到：
+
+1. 0到5780这段“小值”被扩大到0-22622范围，而5780到32767这段“大值”被压缩到22622-32767范围
+2. 0到5780这5781个“小值”， 有75%左右的因为mu律的压扩而受益，即量化误差变小，但有25%的“小值”量化误差反而变大了。
+
+以为是我上面的mathematica代码不对，使用[wiki](https://en.wikipedia.org/wiki/G.711)里的查表法做压扩和编码，也是这个结果：
+
+![](mulaw2.jpg)
+
+测试用的c代码直接放出来：
+
+	int mulaw(int x)
+	{
+	    int s = 0;
+	    if (x < 0) { x = -x; s = 1;} 
+	
+	    uint32_t mask = 0xFFE0;
+	    uint32_t result = 0x20;
+	    uint32_t mask2 = 0x1e;
+	
+	
+	    int i;
+	    for (i = 0; i < 8; i++)
+	    {   
+	        if ( (x & mask) == result || (x & mask) == 0)
+	        {       
+	            int ret = ((x&mask2) >> (i+1)) |  (i<<4);
+	            if (s)      
+	            {           
+	                ret = -ret;     
+	            }           
+	            return ret; 
+	
+	        }       
+	        mask = (mask << 1);
+	        result = (result <<1);
+	        mask2 = (mask2 << 1);
+	    }   
+	    printf("%s:x=0x%x, exit!\n", __FUNCTION__, x); 
+	    exit(-1);
+	}
+	int imulaw(int x)
+	{
+	    int s = 0;
+	    if (x < 0) { x = -x; s = 1;} 
+	
+	    int i;
+	    uint32_t tail = 1;
+	    uint32_t head = 32; 
+	
+	    for (i = 0; i < 8; ++i)
+	    {   
+	        if ( ((x & 0x70) >> 4) == i)
+	        {       
+	            int ret = ((x & 0xf) << (i+1)) + tail + head;
+	            if (s) { ret = -ret;}
+	            return ret;
+	        }
+	        tail *=2;
+	        head *=2;
+	    }
+	    printf("%s:x=0x%x, exit!\n", __FUNCTION__, x);
+	    exit(-1);
+	}
+	int main(int argc, char **argv)
+	{
+	
+	    int i;
+	    int ok = 0;
+	    for (i = 0; i < 5780; ++i)
+	    {
+	        int err1 = abs( i - imulaw(mulaw(i)));
+	        int err2 = abs( i - round(i/256.0)*256);
+	        if (err1 < err2)
+	        {
+	            ok++;
+	        }
+	    }
+	    printf("ok = %d, %f\n", ok, ok/5780.0);
+	    return 0 ;
+	}
+
+

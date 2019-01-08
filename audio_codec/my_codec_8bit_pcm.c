@@ -33,6 +33,7 @@ typedef struct
 } pcm_data_t;
 
 static pcm_data_t g_pcm_data;
+static int g_use_alaw = 0;
 
 
 
@@ -149,6 +150,8 @@ int DM_decode_frame(int fd, uint32_t *sample_rate, uint8_t *channel_num, short p
 
 				 if (val < 0) { val = -val; neg =1 ;}
 				 val =  val*256;
+				if (val > 32767) { val = 32767;}
+				val = ialaw(val);		
 
 				pcm[i] = val;
 				if (neg) { pcm[i] = -pcm[i];}
@@ -236,6 +239,31 @@ int DM_get_frame_size(uint32_t sample_rate, uint8_t channel_num)
 }
 
 
+int alaw(int x)
+{
+
+	if (g_use_alaw)
+	{
+		int v = 	log(1+255*(x/32767.0)) / log(1+255) * INT16_MAX;
+		return v;
+	}
+	else
+	{
+	return x;
+	}
+
+}
+int ialaw(int x)
+{
+	if (g_use_alaw)
+	{
+	return  (exp(x/32767.0*log(1+255)) -1)/255.0*32767;
+	}
+	else
+	{
+	return x;
+	}
+}
 int DM_encode_frame(uint32_t sample_rate, uint8_t channel_num,
 				short pcm_l[], short pcm_r[], unsigned char * frame_buffer)
 {
@@ -290,6 +318,8 @@ int DM_encode_frame(uint32_t sample_rate, uint8_t channel_num,
 			int val = pcm[i][j];
 			if (val < 0) { val = -val; neg = 1;}
 
+			val = alaw(val);	
+
 			int delta1 = round( val/256.0);
 			if (neg) { delta1 = -delta1;}
 
@@ -313,59 +343,6 @@ int comp_float_by_abs(const void * a, const void * b)
 	return 0;
 }
 
-int alaw(int x)
-{
-	int s = 0;
-	if (x < 0) { x = -x; s = 1;}
-
-	uint32_t mask = 0xFFE0;
-	uint32_t result = 0x20;
-	uint32_t mask2 = 0x1e;
-
-
-	int i;
-	for (i = 0; i < 8; i++)
-	{
-		if ( (x & mask) == result || (x & mask) == 0)
-		{
-			int ret = ((x&mask2) >> (i+1)) |  (i<<4);
-			if (s)
-			{
-				ret = -ret;
-			}
-			return ret;
-
-		}
-		mask = (mask << 1);
-		result = (result <<1);
-		mask2 = (mask2 << 1);
-	}
-	printf("%s:x=0x%x, exit!\n", __FUNCTION__, x);
-	exit(-1);
-}
-int ialaw(int x)
-{
-	int s = 0;
-	if (x < 0) { x = -x; s = 1;}
-
-	int i;
-	uint32_t tail = 1;
-	uint32_t head = 32;
-
-	for (i = 0; i < 8; ++i)
-	{
-		if ( ((x & 0x70) >> 4) == i)
-		{
-			int ret = ((x & 0xf) << (i+1)) + tail + head;
-			if (s) { ret = -ret;}
-			return ret;
-		}
-		tail *=2;
-		head *=2;
-	}
-	printf("%s:x=0x%x, exit!\n", __FUNCTION__, x);
-	exit(-1);
-}
 
 int analyze_distribute(const short pcm[], uint32_t pcm_len, uint16_t * step_size)
 {
@@ -591,6 +568,7 @@ void debug_info()
 
 int main(int argc, char **argv)
 {
+
 	if (argc < 3)
 	{
 		printf("usage:%s sourcefile.mp3  destfile.mp3\n",  argv[0]);
@@ -600,6 +578,10 @@ int main(int argc, char **argv)
 		printf("step3:decode pcm use my dpcm codec from bison.data\n");
 		printf("step4:save pcm to destfile.mp3\n");
 		return 0;
+	}
+	if (argc >= 4)
+	{
+		g_use_alaw = atoi(argv[3]);
 	}
 
 	{

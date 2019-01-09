@@ -1,5 +1,5 @@
 
-# 自己实现DPCM编码 #
+# 一、自己实现DPCM编码 #
 
 ## step1：观察差值分布 ##
 
@@ -168,5 +168,106 @@ my\_codec\_8bit\_pcm.c中有引入非均匀量化，主观测试能感受到噪�
 	    printf("ok = %d, %f\n", ok, ok/5780.0);
 	    return 0 ;
 	}
+
+# 二、自己实现类似子带编码 #
+
+根据人听力的特性，对于3k到4K频率范围的声音比较敏感，其他频率范围比较迟钝：
+
+![](hearing.jpg)
+
+因此可以这样来压缩音频数据：
+
+1. 将pcm分帧，每帧通过DCT变换到频域
+2. 对于频域的数据进行量化，整体上会降低数据精度，减少bit率。例如同样的是16bit的采样精度，量化后，更多的高位变成了0。
+3. 人耳敏感频段的采用小的步长，反之采用更大的量化步长。对于不敏感频段，加大量化步长，使得更多的量化结果直接为0
+4. 经过上述量化处理后的数据，再采用哈夫曼等熵编码，可以有效的压缩数据
+
+还可以这样来压缩：
+
+1. 将pcm分帧，每一帧通过不同的带通滤波器分成很多子带
+2. 每个子带采用不同的量化步长来做DPCM编码，或者
+3. 每个子带DCT后，采用不同的量化步长来量化
+4. 然后熵编码
+
+下面的代码快速验证上述第一个方案的可行性：
+
+将pcm做DCT变换后，量化，然后调用7zip软件进行熵编码
+
+	ClearAll["Global`*"];
+	pcm = Import["d:\\005.mp3"];
+
+	(*different quanti size*)
+	quanti[x_]= Which[x<100, 256, 
+					x>=100 && x <1000, 16, 
+					x>=1000&&x<6000, 4, 
+					x>=6000 && x<10000, 16,
+					x>=10000 && x<20000, 256,
+					x>=20000, 24x/875-2048/7];
+	
+	sr=pcm[[1]][[2]];
+	Print["sr:", sr];
+	ch=pcm[[1]][[1]][[1]];
+	
+	len = Length[ch];
+	Print["len:", len];
+	qqq=Table[quanti[x], {x, 1,sr}];
+	qqq[[1]] = 1;
+	Print[ListLogPlot[qqq]];
+
+	start=1;
+	newch={};
+	zeroCount={0,0,0};
+	pcmfd="d:\pcm.data";
+	dctfd="d:\pcmdct.data";
+
+	While[start+sr-1<=len,
+		(*get a frame, 1 second long*)
+		input=Round[ch[[start;;start+sr-1]]*32767];
+		start =start+sr;
+
+		(*count zero and write to file*)
+		Do[ 
+			If[input[[i]] == 0,zeroCount[[1]] = zeroCount[[1]]+1, null];
+			BinaryWrite[pcmfd,input[[i]], "Integer16"], 
+			{i, 1,sr}
+		];
+		
+		ddd=FourierDCT[input];
+		Do[ 
+			If[ddd[[i]] == 0,zeroCount[[2]] = zeroCount[[2]]+1, null], 
+			{i, 1,sr}
+		];
+		
+		(*quantify and write to file*)
+		ddd2=Round[ddd/qqq];
+		Do[ 
+			If[ddd2[[i]] == 0,zeroCount[[3]] = zeroCount[[3]]+1, null];
+			BinaryWrite[dctfd,ddd2[[i]], "Integer16"], 
+			{i, 1,sr}
+		];
+
+		(* idct recovery the audio sig *)
+		ddd=ddd2*qqq;
+		ddd3=FourierDCT[ddd,3];
+		newch=Join[newch, ddd3/32767];
+	
+	];
+	Print["zero count:", zeroCount];
+	Close[pcmfd];
+	Close[dctfd];
+	
+	(* entropy coding *)
+	Run["7z a d:\aaa.zip d:\pcm.data"];
+	Run["7z a d:\bbb.zip d:\pcmdct.data"];
+
+	(* listen and check the quality *)
+	Sound[SampledSoundList[{newch, newch}, sr]]
+
+
+![](dct_quantify.jpg)
+
+可以看到，经过dct、quantify后，同样的熵编码压缩，大小是原来的1/3。
+
+经过主观对比测试，语音和音乐的音质都没有明显的下降，引入了一些白噪声，应该通过一些算法可以过滤掉。
 
 

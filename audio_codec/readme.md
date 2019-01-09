@@ -1,5 +1,5 @@
 
-# 一、自己实现DPCM编码 #
+# 压缩方案一：类似DPCM编码 #
 
 ## step1：观察差值分布 ##
 
@@ -169,7 +169,7 @@ my\_codec\_8bit\_pcm.c中有引入非均匀量化，主观测试能感受到噪�
 	    return 0 ;
 	}
 
-# 二、自己实现类似子带编码 #
+# 压缩方案二：DCT后量化再熵编码 #
 
 根据人听力的特性，对于3k到4K频率范围的声音比较敏感，其他频率范围比较迟钝：
 
@@ -182,14 +182,8 @@ my\_codec\_8bit\_pcm.c中有引入非均匀量化，主观测试能感受到噪�
 3. 人耳敏感频段的采用小的步长，反之采用更大的量化步长。对于不敏感频段，加大量化步长，使得更多的量化结果直接为0
 4. 经过上述量化处理后的数据，再采用哈夫曼等熵编码，可以有效的压缩数据
 
-还可以这样来压缩：
 
-1. 将pcm分帧，每一帧通过不同的带通滤波器分成很多子带
-2. 每个子带采用不同的量化步长来做DPCM编码，或者
-3. 每个子带DCT后，采用不同的量化步长来量化
-4. 然后熵编码
-
-下面的代码快速验证上述第一个方案的可行性：
+下面的代码快速验证上述方案：
 
 将pcm做DCT变换后，量化，然后调用7zip软件进行熵编码
 
@@ -217,8 +211,8 @@ my\_codec\_8bit\_pcm.c中有引入非均匀量化，主观测试能感受到噪�
 	start=1;
 	newch={};
 	zeroCount={0,0,0};
-	pcmfd="d:\pcm.data";
-	dctfd="d:\pcmdct.data";
+	pcmfd="d:\\pcm.data";
+	dctfd="d:\\pcmdct.data";
 
 	While[start+sr-1<=len,
 		(*get a frame, 1 second long*)
@@ -257,8 +251,8 @@ my\_codec\_8bit\_pcm.c中有引入非均匀量化，主观测试能感受到噪�
 	Close[dctfd];
 	
 	(* entropy coding *)
-	Run["7z a d:\aaa.zip d:\pcm.data"];
-	Run["7z a d:\bbb.zip d:\pcmdct.data"];
+	Run["7z a d:\\aaa.zip d:\\pcm.data"];
+	Run["7z a d:\\bbb.zip d:\\pcmdct.data"];
 
 	(* listen and check the quality *)
 	Sound[SampledSoundList[{newch, newch}, sr]]
@@ -270,4 +264,119 @@ my\_codec\_8bit\_pcm.c中有引入非均匀量化，主观测试能感受到噪�
 
 经过主观对比测试，语音和音乐的音质都没有明显的下降，引入了一些白噪声，应该通过一些算法可以过滤掉。
 
+不过简单的统一采取256的量化步长，似乎也ok，就白噪声更大一点，压缩率也更大。 ：）
+
+
+# 压缩方案三：分子带后量化并熵编码 #
+
+可以这样来压缩：
+
+1. 将pcm分帧，每一帧通过不同的带通滤波器分成很多子带
+2. 每个子带采用不同的量化步长来做DPCM编码，或者
+3. 每个子带DCT后，采用不同的量化步长来量化
+4. 然后熵编码
+
+先编译两个函数，一个用来初始化32个带通滤波器，一个函数用来将512个采样值分别与这32个滤波器做卷积：
+
+	ClearAll["Global`*"];
+	
+	InitFilters=Compile[{},
+		Module[{M,K,fc,h,i,j,kk,n},
+			kk=Table[{},{i,1,32}];
+			M=512;
+			K=0.55;
+			fc=0.01;
+			h=Table[If[i==M/2,2Pi*fc*K,K*Sin[2Pi*fc*(i-M/2)]/(i-M/2)*(0.42-0.5Cos[2Pi*i/M]+0.08Cos[4Pi*i/M])],
+					{i,0,M}];
+			h=h[[1;;512]];
+			Do[
+				kk[[i+1]]=Table[h[[n+1]]*Cos[Pi*(2*i+1)*(n-16)/64],{n,0,511}],
+				{i,0,31}
+			];
+			kk
+		]
+	];
+	GetSuband=Compile[{{sigs, _Real, 1},{kern,_Real, 2}},
+		Module[{input=sigs, hh=kern,i,pp,subs},
+		
+			subs = Table[{}, {i, 0, 31}];
+			
+			Do[
+				pp=ListConvolve[ hh[[i+1]], input, 1];
+				（*phase correction*)
+				subs[[i+1]] = Join[pp[[275;;512]], pp[[1;;274]] ],
+				{i,0,31}
+			];
+			
+			subs
+		]
+	];
+
+下面是这些带通滤波器的一些情况：
+
+![](filtering.jpg)
+
+用一个信号试一下拆分后的子带信号可否合成原信号：
+
+	input=Table[Sin[2Pi*i/512]+2Cos[20Pi*i/512]+3, {i, 1, 512}];
+	Print[ListLinePlot[input, PlotLabel->"input signal"]];
+	kk = InitFilters[];
+	subs = GetSuband[input, kk];
+	ss=Table[0, {i, 1,512}];
+	
+	Do[
+		ss = ss + subs[[i]],
+		{i, 1, 32}
+	];
+	Print[ListLinePlot[{ss, input}, PlotLabel->"synthesis vs input signals"]];
+
+输入结果显示合成很成功：
+
+![](suband_synthesis.jpg)
+
+然后将pcm分帧，每帧长度为512个采样值。每个帧通过带通滤波器后，每个子带采取不同的量化步长。
+
+	pcm=Import["d:\\music.mp3"];
+	
+	sr=pcm[[1]][[2]];
+	Print["sr:",sr];
+	ch=pcm[[1]][[1]][[1]];
+	
+	len=Length[ch];
+	Print["len:",len];
+	framesz = 512;
+	qqq=Table[256,{x,1,32}];
+	start=1;
+	newch={};
+	kk = InitFilters[];
+	
+	pcmfd="d:\\pcm.data";
+	dctfd="d:\\pcmdct.data";
+	
+	While[start+framesz-1<=len,
+		input=Round[ch[[start;;start+framesz-1]]*32767];
+		start=start+framesz;
+		(* write to file*)
+		BinaryWrite[pcmfd,input,"Integer16"];
+		subs = GetSuband[input,kk];
+		ss = Table[0, {i, 1,framesz}];
+		Do[
+			subs[[i]] = Round[subs[[i]]/qqq[[i]]];
+			ss = ss + subs[[i]]*qqq[[i]],
+			{i, 1,32}
+		];
+		
+		BinaryWrite[dctfd,ss,"Integer16"];
+		newch=Join[newch,ss/32767];
+	];
+	
+	Close[pcmfd];
+	Close[dctfd];
+	
+	(*entropy coding*)
+	Run["7z a d:\\aaa.zip d:\\pcm.data"];
+	Run["7z a d:\\bbb.zip d:\\pcmdct.data"];
+	
+	(*listen and check the quality*)
+	Sound[SampledSoundList[{newch,newch},sr]]
 

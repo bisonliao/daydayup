@@ -389,3 +389,88 @@ my\_codec\_8bit\_pcm.c中有引入非均匀量化，主观测试能感受到噪�
 
 压缩效果并不明显。两个文件经过7zip压缩后都没有怎么缩小。
 
+
+# 压缩方案四：子带化后下采样再量化熵编码 #
+
+可以这样来压缩：
+
+1. 将pcm分帧，每一帧长4096，DCT后，分为16个子带频谱，每个长255
+2. 每个子带的频谱移动到0-255低频位置，IDCT到时域
+3. 由于移动到低频部分了，根据那奎斯特定理，采样率不需要那么高，对子带的时域信号做下采样1/16
+4. 对下采样后的子带时域信号进行量化和熵编码。 这个时候，采样数已经下降到原来的1/16，达到了压缩的目的
+
+恢复是逆向的过程。
+
+![](suband_synthesis2.jpg)
+
+同样的，用一段mathematica代码快速验证一下信号恢复的效果：
+
+	(*
+		input a signal which length is 4096, 
+		output 16 subband spectram,each length is 16
+	*)
+	ToSuband=Compile[{{in, _Real, 1}},
+		Module[{input = in,num,spect,oneband, subs, i},
+			num = 4096;
+			spect = FourierDCT[input];
+			
+			subs=Table[{}, {i, 1,16}];
+			Do[
+				oneband = spect[[i*256+1;;i*256+256]];(*len=256, num=16, frequency domain*)
+				
+				
+				oneband = FourierDCT[oneband , 3];(*len=256, num=16,time domain*)
+				
+				oneband = Downsample[oneband , 16];(*len=16, num=16,time domain*)
+				
+				oneband = FourierDCT[oneband ] ;(*len=16, num=16, frequency domain*)
+				
+				subs[[i+1]] = oneband,
+				{i, 0, 15}
+			];
+			
+			subs
+		]
+	
+	];
+
+	(*
+		input 16 subband spectram,each length is 16
+		output a signal which length is 4096, 
+		
+	*)
+
+	FromSuband=Compile[{  {subband, _Real,2}},
+		Module[{subs = subband,num,spect,oneband,  i},
+			spect={};
+			
+			Do[
+				oneband  =subs[[i+1]];
+				oneband = FourierDCT[oneband,3] ;(*len=16, num=16, time domain*)
+			
+				oneband = Table[Interpolation[oneband ,p], {p, 1, 16, 1/17}];(*len=256, num=16,time domain*)
+			
+				oneband = FourierDCT[oneband ];(*len=256, num=16,freq domain*)
+				spect = Join[spect, oneband],
+				{i, 0, 15}
+			];
+			
+			Print[Length[spect]];
+			output = FourierDCT[spect, 3];
+			output
+		]
+	];
+	
+	(*test two functions above*)
+	input=Table[Sin[i/4096 * 2Pi]+0.2*Sin[i/4096 * 10Pi], {i, 1, 4096}];
+	Print[ListLinePlot[input]];
+	subs = ToSuband[input];
+	Print[Length[subs],",", Length[subs[[1]] ] ];
+	output=FromSuband[subs];
+	ListLinePlot[{input, output}]
+
+
+下面是输出结果，可以看到信号恢复的还可以，但后半段失真比较大，不知道是不是有bug
+
+![](suband_synthesis3.jpg)
+

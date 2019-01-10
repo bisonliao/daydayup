@@ -303,7 +303,7 @@ my\_codec\_8bit\_pcm.c中有引入非均匀量化，主观测试能感受到噪�
 			
 			Do[
 				pp=ListConvolve[ hh[[i+1]], input, 1];
-				（*phase correction*)
+				(*phase correction*)
 				subs[[i+1]] = Join[pp[[275;;512]], pp[[1;;274]] ],
 				{i,0,31}
 			];
@@ -345,13 +345,18 @@ my\_codec\_8bit\_pcm.c中有引入非均匀量化，主观测试能感受到噪�
 	len=Length[ch];
 	Print["len:",len];
 	framesz = 512;
-	qqq=Table[256,{x,1,32}];
+	
+	qqq={256,256,16,16,4,4,16,16,16,256,256,512,512,1024,1024,1024};
+	qqq = Join[qqq, Table[1024, {i, 1,16}]];
+
 	start=1;
 	newch={};
 	kk = InitFilters[];
 	
 	pcmfd="d:\\pcm.data";
 	dctfd="d:\\pcmdct.data";
+
+	smoothFilter={1/11,1/11,1/11,1/11,1/11,1/11,1/11,1/11,1/11,1/11,1/11,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 	
 	While[start+framesz-1<=len,
 		input=Round[ch[[start;;start+framesz-1]]*32767];
@@ -365,6 +370,8 @@ my\_codec\_8bit\_pcm.c中有引入非均匀量化，主观测试能感受到噪�
 			ss = ss + subs[[i]]*qqq[[i]],
 			{i, 1,32}
 		];
+
+		ss = Round[ListConvolve[smoothFilter, ss, 1]];
 		
 		BinaryWrite[dctfd,ss,"Integer16"];
 		newch=Join[newch,ss/32767];
@@ -379,4 +386,6 @@ my\_codec\_8bit\_pcm.c中有引入非均匀量化，主观测试能感受到噪�
 	
 	(*listen and check the quality*)
 	Sound[SampledSoundList[{newch,newch},sr]]
+
+压缩效果并不明显。两个文件经过7zip压缩后都没有怎么缩小。
 

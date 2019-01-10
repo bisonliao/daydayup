@@ -405,6 +405,12 @@ my\_codec\_8bit\_pcm.c中有引入非均匀量化，主观测试能感受到噪�
 
 同样的，用一段mathematica代码快速验证一下信号恢复的效果：
 
+	MyDownsample=Compile[{{v, _Real, 1}},
+		Module[{vv = v,output},
+			Table[Part[vv, x], {x, 1,256, 17}]
+		]
+	];
+
 	(*
 		input a signal which length is 4096, 
 		output 16 subband spectram,each length is 16
@@ -421,7 +427,7 @@ my\_codec\_8bit\_pcm.c中有引入非均匀量化，主观测试能感受到噪�
 				
 				oneband = FourierDCT[oneband , 3];(*len=256, num=16,time domain*)
 				
-				oneband = Downsample[oneband , 16];(*len=16, num=16,time domain*)
+				oneband = MyDownsample[oneband];(*len=16, num=16,time domain*)
 				
 				oneband = FourierDCT[oneband ] ;(*len=16, num=16, frequency domain*)
 				
@@ -470,7 +476,7 @@ my\_codec\_8bit\_pcm.c中有引入非均匀量化，主观测试能感受到噪�
 	ListLinePlot[{input, output}]
 
 
-下面是输出结果，可以看到信号恢复的还可以，但后半段失真比较大，不知道是不是有bug
+下面是输出结果，可以看到信号恢复的还可以。注意，直接用mathematica提供的Downsample与后面的插值函数不太对付，会导致较大的失真，所以自己写了一个下采样函数。
 
 ![](suband_synthesis3.jpg)
 

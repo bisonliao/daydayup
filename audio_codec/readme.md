@@ -486,4 +486,117 @@ my\_codec\_8bit\_pcm.c中有引入非均匀量化，主观测试能感受到噪�
 
 ![](whats_wrong.jpg)
 
+代码有一点点修改，如下：
 
+	ClearAll["Global`*"];
+	MyDownsample = Compile[{{v, _Real, 1}},
+	   
+	   Module[{vv = v, output, x, index},
+	    
+	    index = Table[x, {x, 1, 256, 17}];
+	    
+	    Table[Part[vv, x], {x, index}]
+	    ]
+	   ];
+	MyLog[v_] := Module[{input = v, output, len, z},
+	   output = input;
+	   len = Length[input];
+	   Do[
+	    If[input[[z]] > 0, output[[z]] = Log10[input[[z]]  ], null];
+	    If[input[[z]] == 0, output[[z]] = 0, null];
+	    If[input[[z]] < 0, output[[z]] = -Log10[-input[[z]]  ], null],
+	    {z, 1, len}
+	    ];
+	   output
+	   ];
+	
+	(*input a signal which length is 4096,output 16 subband spectram,each \
+	length is 16*)
+	ToSuband = Compile[{{in, _Real, 1}},
+	   Module[{input = in, num, spect, oneband, subs, i}, num = 4096;
+	    spect = FourierDCT[input];
+	    subs = Table[{}, {i, 1, 16}];
+	    Do[
+	     oneband = spect[[i*256 + 1 ;; i*256 + 256]];(*len=256,num=16,
+	     frequency domain*)
+	     oneband1 = oneband;
+	     oneband = FourierDCT[oneband, 3];(*len=256,num=16,time domain*)
+	     oneband2 = oneband;
+	     oneband = MyDownsample[oneband];(*len=16,num=16,time domain*)
+	     oneband3 = oneband;
+	     oneband4 = 
+	      Table[Interpolation[oneband, p, InterpolationOrder -> 1], {p, 1,
+	         16, 1/17}];
+	     
+	     
+	     If[i == 3 || i == 7 || i == 0,
+	      Print[
+	       ListPlot[{MyLog[oneband1]}, 
+	        PlotLabel -> 
+	         "spect before downsample in suband #" <> ToString[(i + 1)], 
+	        PlotRange -> All]];
+	      Print[
+	       ListPlot[{MyLog[oneband2]}, 
+	        PlotLabel -> 
+	         "sig before downsample in suband #" <> ToString[(i + 1)], 
+	        PlotRange -> All]];
+	      Print[
+	       ListPlot[{MyLog[oneband3]}, 
+	        PlotLabel -> 
+	         "sig after downsample in suband #" <> ToString[(i + 1)], 
+	        PlotRange -> All]];
+	      Print[
+	       ListPlot[{MyLog[oneband4]}, 
+	        PlotLabel -> 
+	         "sig after upsample in suband #" <> ToString[(i + 1)], 
+	        PlotRange -> All]];
+	      Print[
+	       ListPlot[{MyLog[FourierDCT[oneband4]]}, 
+	        PlotLabel -> 
+	         "spect after upsample in suband #" <> ToString[(i + 1)], 
+	        PlotRange -> All]],
+	      null];
+	     (*
+	     
+	     *)
+	     
+	     
+	     oneband = FourierDCT[oneband];(*len=16,num=16,
+	     frequency domain*)
+	     
+	     subs[[i + 1]] = oneband,
+	     {i, 0, 15}];
+	    subs
+	    ]
+	   ];
+	
+	(*input 16 subband spectram,each length is 16 output a signal which \
+	length is 4096,*)
+	
+	FromSuband = Compile[{{subband, _Real, 2}},
+	   Module[{subs = subband, num, spect, oneband, i}, spect = {};
+	    Do[oneband = subs[[i + 1]];
+	     oneband = FourierDCT[oneband, 3];(*len=16,num=16,time domain*)
+	     oneband = 
+	      Table[Interpolation[oneband, p], {p, 1, 16, 1/17}];(*len=256,
+	     num=16,time domain*)
+	     
+	     oneband = FourierDCT[oneband];(*len=256,num=16,freq domain*)
+	     spect = Join[spect, oneband], {i, 0, 15}
+	     ];
+	    output = FourierDCT[spect, 3];
+	    output
+	    ]
+	   ];
+	
+	(*test two functions above*)
+	input = Table[(Sin[i/4096*2 Pi] + 
+	      0.2*Sin[i/4096*2 Pi*1000])*32767, {i, 1, 4096}];
+	inputdct = FourierDCT[input];
+	Print[ListPlot[input, PlotLabel -> "input signal"]];
+	Print[ListPlot[MyLog[inputdct], PlotLabel -> "input signal spectram"]];
+	subs = ToSuband[input];
+	Print[Length[subs], ",", Length[subs[[1]]]];
+	output = FromSuband[subs];
+	
+	ListLinePlot[{input, output}]

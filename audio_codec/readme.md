@@ -394,10 +394,14 @@ my\_codec\_8bit\_pcm.c中有引入非均匀量化，主观测试能感受到噪�
 
 可以这样来压缩：
 
-1. 将pcm分帧，每一帧长4096，DCT后，分为16个子带频谱，每个长255
+1. 将pcm分帧，每一帧长4096，DCT后，分为16个子带频谱，每个长256
 2. 每个子带的频谱移动到0-255低频位置，IDCT到时域
 3. 由于移动到低频部分了，根据那奎斯特定理，采样率不需要那么高，对子带的时域信号做下采样1/16
-4. 对下采样后的子带时域信号进行量化和熵编码。 这个时候，采样数已经下降到原来的1/16，达到了压缩的目的
+4. 对下采样后的子带时域信号进行量化和熵编码。 
+
+需要注意的是，每个子带的频谱移动到低频位置后，以及IDCT到时间域后，数值个数都是4096个，一个帧的数值个数是4096X16，只有下采样后，才又成为256X16个数值。
+
+一开始我把子带频谱移动到低频位置后，只保留了0-255这256个数值，下采样后每个子带在时域只有16个数值，这个做法经验证是错误的，音频恢复不出来。
 
 恢复是逆向的过程。
 
@@ -405,97 +409,11 @@ my\_codec\_8bit\_pcm.c中有引入非均匀量化，主观测试能感受到噪�
 
 同样的，用一段mathematica代码快速验证一下信号恢复的效果：
 
-	MyDownsample=Compile[{{v, _Real, 1}},
-		Module[{vv = v,output},
-			Table[Part[vv, x], {x, 1,256, 17}]
-		]
-	];
-
-	(*
-		input a signal which length is 4096, 
-		output 16 subband spectram,each length is 16
-	*)
-	ToSuband=Compile[{{in, _Real, 1}},
-		Module[{input = in,num,spect,oneband, subs, i},
-			num = 4096;
-			spect = FourierDCT[input];
-			
-			subs=Table[{}, {i, 1,16}];
-			Do[
-				oneband = spect[[i*256+1;;i*256+256]];(*len=256, num=16, frequency domain*)
-				
-				
-				oneband = FourierDCT[oneband , 3];(*len=256, num=16,time domain*)
-				
-				oneband = MyDownsample[oneband];(*len=16, num=16,time domain*)
-				
-				oneband = FourierDCT[oneband ] ;(*len=16, num=16, frequency domain*)
-				
-				subs[[i+1]] = oneband,
-				{i, 0, 15}
-			];
-			
-			subs
-		]
-	
-	];
-
-	(*
-		input 16 subband spectram,each length is 16
-		output a signal which length is 4096, 
-		
-	*)
-
-	FromSuband=Compile[{  {subband, _Real,2}},
-		Module[{subs = subband,num,spect,oneband,  i},
-			spect={};
-			
-			Do[
-				oneband  =subs[[i+1]];
-				oneband = FourierDCT[oneband,3] ;(*len=16, num=16, time domain*)
-			
-				oneband = Table[Interpolation[oneband ,p], {p, 1, 16, 1/17}];(*len=256, num=16,time domain*)
-			
-				oneband = FourierDCT[oneband ];(*len=256, num=16,freq domain*)
-				spect = Join[spect, oneband],
-				{i, 0, 15}
-			];
-			
-			Print[Length[spect]];
-			output = FourierDCT[spect, 3];
-			output
-		]
-	];
-	
-	(*test two functions above*)
-	input=Table[Sin[i/4096 * 2Pi]+0.2*Sin[i/4096 * 10Pi], {i, 1, 4096}];
-	Print[ListLinePlot[input]];
-	subs = ToSuband[input];
-	Print[Length[subs],",", Length[subs[[1]] ] ];
-	output=FromSuband[subs];
-	ListLinePlot[{input, output}]
-
-
-下面是输出结果，可以看到信号恢复的还可以。注意，直接用mathematica提供的Downsample与后面的插值函数不太对付，会导致较大的失真，所以自己写了一个下采样函数。
-
-![](suband_synthesis3.jpg)
-
-差点被误导了，上面的信号是低频的，所以恢复不错，对一段音频做上述操作，就完全恢复不出来，即使只做1/2下采样。
-
-老老实实搞个信号一步一步分析吧。输入1Hz+1000Hz的合成信号。按理说4K的采样率，最多可以有2000Hz的分量频率。 画个图一步一步跟踪，想要把问题定位出来，未果：
-
-![](whats_wrong.jpg)
-
-代码有一点点修改，如下：
-
 	ClearAll["Global`*"];
 	MyDownsample = Compile[{{v, _Real, 1}},
 	   
 	   Module[{vv = v, output, x, index},
-	    
-	    index = Table[x, {x, 1, 256, 17}];
-	    
-	    Table[Part[vv, x], {x, index}]
+	     Table[Part[vv, x], {x, 1, 4096, 16}]
 	    ]
 	   ];
 	MyLog[v_] := Module[{input = v, output, len, z},
@@ -511,58 +429,21 @@ my\_codec\_8bit\_pcm.c中有引入非均匀量化，主观测试能感受到噪�
 	   ];
 	
 	(*input a signal which length is 4096,output 16 subband spectram,each \
-	length is 16*)
+	length is 256*)
 	ToSuband = Compile[{{in, _Real, 1}},
-	   Module[{input = in, num, spect, oneband, subs, i}, num = 4096;
+	   Module[{input = in, num, spect, oneband, subs, i, k},
 	    spect = FourierDCT[input];
 	    subs = Table[{}, {i, 1, 16}];
 	    Do[
-	     oneband = spect[[i*256 + 1 ;; i*256 + 256]];(*len=256,num=16,
-	     frequency domain*)
+	     oneband = Table[0.0, {k, 1, 4096}];
+	     oneband[[1 ;; 256]] = spect[[i*256 + 1 ;; i*256 + 256]];
 	     oneband1 = oneband;
-	     oneband = FourierDCT[oneband, 3];(*len=256,num=16,time domain*)
+	     oneband = FourierDCT[oneband, 3];
 	     oneband2 = oneband;
-	     oneband = MyDownsample[oneband];(*len=16,num=16,time domain*)
+	     oneband = MyDownsample[oneband];(*len=16,num=256,time domain*)
 	     oneband3 = oneband;
-	     oneband4 = 
-	      Table[Interpolation[oneband, p, InterpolationOrder -> 1], {p, 1,
-	         16, 1/17}];
 	     
 	     
-	     If[i == 3 || i == 7 || i == 0,
-	      Print[
-	       ListPlot[{MyLog[oneband1]}, 
-	        PlotLabel -> 
-	         "spect before downsample in suband #" <> ToString[(i + 1)], 
-	        PlotRange -> All]];
-	      Print[
-	       ListPlot[{MyLog[oneband2]}, 
-	        PlotLabel -> 
-	         "sig before downsample in suband #" <> ToString[(i + 1)], 
-	        PlotRange -> All]];
-	      Print[
-	       ListPlot[{MyLog[oneband3]}, 
-	        PlotLabel -> 
-	         "sig after downsample in suband #" <> ToString[(i + 1)], 
-	        PlotRange -> All]];
-	      Print[
-	       ListPlot[{MyLog[oneband4]}, 
-	        PlotLabel -> 
-	         "sig after upsample in suband #" <> ToString[(i + 1)], 
-	        PlotRange -> All]];
-	      Print[
-	       ListPlot[{MyLog[FourierDCT[oneband4]]}, 
-	        PlotLabel -> 
-	         "spect after upsample in suband #" <> ToString[(i + 1)], 
-	        PlotRange -> All]],
-	      null];
-	     (*
-	     
-	     *)
-	     
-	     
-	     oneband = FourierDCT[oneband];(*len=16,num=16,
-	     frequency domain*)
 	     
 	     subs[[i + 1]] = oneband,
 	     {i, 0, 15}];
@@ -570,33 +451,99 @@ my\_codec\_8bit\_pcm.c中有引入非均匀量化，主观测试能感受到噪�
 	    ]
 	   ];
 	
-	(*input 16 subband spectram,each length is 16 output a signal which \
+	(*input 16 subband spectram,each length is 256, output a signal which \
 	length is 4096,*)
 	
 	FromSuband = Compile[{{subband, _Real, 2}},
-	   Module[{subs = subband, num, spect, oneband, i}, spect = {};
-	    Do[oneband = subs[[i + 1]];
-	     oneband = FourierDCT[oneband, 3];(*len=16,num=16,time domain*)
+	   Module[{subs = subband, num, spect, oneband, i, output},
+	    spect = {};
+	    Do[
 	     oneband = 
-	      Table[Interpolation[oneband, p], {p, 1, 16, 1/17}];(*len=256,
-	     num=16,time domain*)
-	     
-	     oneband = FourierDCT[oneband];(*len=256,num=16,freq domain*)
-	     spect = Join[spect, oneband], {i, 0, 15}
+	      Table[Interpolation[Part[subs, i + 1], p, 
+	        InterpolationOrder -> 1], {p, 1, 256, 10585/170000}];
+	     oneband = FourierDCT[oneband];
+	     spect = Join[spect, oneband[[1 ;; 256]]],
+	     {i, 0, 15}
 	     ];
 	    output = FourierDCT[spect, 3];
 	    output
 	    ]
 	   ];
 	
+	
 	(*test two functions above*)
 	input = Table[(Sin[i/4096*2 Pi] + 
 	      0.2*Sin[i/4096*2 Pi*1000])*32767, {i, 1, 4096}];
-	inputdct = FourierDCT[input];
-	Print[ListPlot[input, PlotLabel -> "input signal"]];
-	Print[ListPlot[MyLog[inputdct], PlotLabel -> "input signal spectram"]];
+	Print[ListPlot[{input}, PlotLabel -> "input signal"]];
 	subs = ToSuband[input];
-	Print[Length[subs], ",", Length[subs[[1]]]];
 	output = FromSuband[subs];
+	Print[ListPlot[{output}, PlotLabel -> "synthesis signal"]];
+	Print[ListLinePlot[{output[[3401 ;; 3420]], input[[3401 ;; 3420]]}, 
+	   PlotLabel -> "samples compare"]];
+
+
+下面是输出结果，可以看到信号恢复的还可以。注意，直接用mathematica提供的Downsample与后面的插值函数不太对付，会导致较大的失真，所以自己写了一个下采样函数。
+
+![](suband_synthesis3.jpg)
+
+搞一段音频试一下：
+
+	pcm = Import["d:\\005.mp3"];
+	sr = pcm[[1]][[2]];
+	Print["sr:", sr];
+	ch = pcm[[1]][[1]][[1]];
 	
-	ListLinePlot[{input, output}]
+	len = Length[ch];
+	Print["len:", len];
+	(*each quantify step for one sub band. qqq[index] for subband[index]*)
+	
+	
+	qqq = {256, 16, 4, 4, 4, 4, 4, 16, 16, 256, 256, 512, 512, 1024, 1024,
+	    1024};
+	start = 1;
+	newch = {};
+	zeroCount = {0, 0, 0};
+	pcmfd = "d:\\pcm.data";
+	dctfd = "d:\\pcmdct.data";
+	framesz = 4096;
+	
+	While[start + framesz - 1 <= len,
+	  input = Round[ch[[start ;; start + framesz - 1]]*32767];
+	  start = start + framesz;
+	  
+	  BinaryWrite[pcmfd, input, "Integer16"];
+	  subs = ToSuband[input];
+	  
+	  Do[
+	   subs[[i]] = Round[subs[[i]]/qqq[[i]]];
+	   ,
+	   {i, 1, 16}
+	   ];
+	  
+	  Print[Length[input], ",", Length[subs], ",", Length[subs[[1]]]];
+	  BinaryWrite[dctfd, subs, "Integer16"];
+	  Do[
+	   subs[[i]] = subs[[i]]*qqq[[i]];
+	   ,
+	   {i, 1, 16}
+	   ];
+	  
+	  output = FromSuband[subs];
+	  newch = Join[newch, output/32767];
+	  ];
+	
+	Close[pcmfd];
+	Close[dctfd];
+	
+	(*entropy coding*)
+	Run["7z a d:\\aaa.zip d:\\pcm.data"];
+	Run["7z a d:\\bbb.zip d:\\pcmdct.data"];
+	
+	(*listen and check the quality*)
+	Sound[SampledSoundList[{newch, newch}, sr]]
+
+压缩效果很明显，1/4大小，音质没有明显变化。
+不过Compile不知道遇到什么问题，没有能够编译成内部的更快的函数，执行起来很慢。
+
+![](sbc.jpg)
+

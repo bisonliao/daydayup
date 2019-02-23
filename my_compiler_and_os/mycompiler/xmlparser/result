@@ -1,0 +1,3 @@
+dllwrap  --dllname Xml.dll obj/xml_C.o obj/xmlnode.o obj/xmlread.yy.o obj/AnsiString.o obj/xml.o obj/main.o obj/xmlread2.zz.o obj/xml2.o -lstdc++
+dllwrap: no export definition file provided.
+Creating one, but that may not be what you want

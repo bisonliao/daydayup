@@ -1,0 +1,39 @@
+#! ../main2/bisonliao -f 
+ 
+function main
+begin
+	fprintf(1, "%d\n", fff());
+end
+
+function fff
+begin
+	$mysql = mysql_connect("172.16.208.143", 3306, "datasvrusr", "datasvrusr@db", "test");
+	if ($mysql < 0)
+	then
+		fprintf(2, "mysql_connect failed!\n");
+		return 0-1;
+	endif
+
+	if (mysql_query($mysql, "select * from test.ttt where ttt !='1'") < 0)
+	then
+		fprintf(2, "mysql_query failed!\n");
+		return 0-1;
+	endif
+
+	if (mysql_getFieldTitle($mysql, $title) == 0)
+	then
+		fprintf(1, "title=[%s]\n", $title);
+	endif
+	
+	while (mysql_fetchrow($mysql, $row) == 1)
+	do
+		fprintf(1, "row=[%s]\n", $row);
+	endwhile
+
+	fprintf(1, "%d\n", mysql_query($mysql, "insert into test.ttt values('2')"));
+	fprintf(1, "affected row number=%d\n", mysql_getAffectedRowNum($mysql));
+
+	mysql_close($mysql);
+
+	return 0;
+end

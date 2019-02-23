@@ -1,0 +1,23 @@
+0 ""
+1 "string\" values"
+%%
+LABEL F_main_BEGIN
+DEPTH
+VAR a STRING
+PUSH %0
+SAV a
+LABEL L_3
+PUSH a
+PUSH %1
+ADD
+SAV a
+PUSH a
+PUSH #1
+CALL strlen
+PUSH #100
+GT
+GOTOTFALSE L_3
+LABEL L_2
+LABEL F_main_END
+_DEPTH
+RECALL

@@ -1,0 +1,469 @@
+
+Allocating common symbols
+Common symbol       size              file
+
+g_tss_selector      0x2               obj/global.o
+g_syscall_param_ecx
+                    0x4               obj/global.o
+g_idt_selector      0x2               obj/global.o
+g_syscall_param_ebx
+                    0x4               obj/global.o
+g_procs             0x198             obj/global.o
+g_tss               0x68              obj/global.o
+g_idtr48            0x6               obj/global.o
+g_syscall_param_edx
+                    0x4               obj/global.o
+g_idt               0x7f8             obj/global.o
+g_kernel_stack_selector
+                    0x2               obj/global.o
+g_gdtr48            0x6               obj/global.o
+g_kernel_gs_selector
+                    0x2               obj/global.o
+g_kernel_data_selector
+                    0x2               obj/global.o
+g_gdt               0x40              obj/global.o
+g_syscall_param_eax
+                    0x4               obj/global.o
+g_kernel_code_selector
+                    0x2               obj/global.o
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+*default*        0x0000000000000000 0xffffffffffffffff
+
+Linker script and memory map
+
+Address of section .text set to 0xc800
+LOAD obj/head.o
+LOAD obj/main.o
+LOAD obj/common_func.o
+LOAD obj/asm.o
+LOAD obj/global.o
+LOAD obj/syscall.o
+LOAD obj/test_proc.o
+LOAD obj/api.o
+LOAD obj/schedule.o
+LOAD obj/keyboard.o
+LOAD obj/keyboard_buf.o
+LOAD obj/task.o
+LOAD obj/tty.o
+                0x0000000008048000                . = (0x8048000 + SIZEOF_HEADERS)
+
+.interp
+ *(.interp)
+
+.hash
+ *(.hash)
+
+.dynsym
+ *(.dynsym)
+
+.dynstr
+ *(.dynstr)
+
+.gnu.version
+ *(.gnu.version)
+
+.gnu.version_d
+ *(.gnu.version_d)
+
+.gnu.version_r
+ *(.gnu.version_r)
+
+.rel.init
+ *(.rel.init)
+
+.rela.init
+ *(.rela.init)
+
+.rel.text
+ *(.rel.text.rel.text.*.rel.gnu.linkonce.t.*)
+
+.rela.text
+ *(.rela.text.rela.text.*.rela.gnu.linkonce.t.*)
+
+.rel.fini
+ *(.rel.fini)
+
+.rela.fini
+ *(.rela.fini)
+
+.rel.rodata
+ *(.rel.rodata.rel.rodata.*.rel.gnu.linkonce.r.*)
+
+.rela.rodata
+ *(.rela.rodata.rela.rodata.*.rela.gnu.linkonce.r.*)
+
+.rel.data
+ *(.rel.data.rel.data.*.rel.gnu.linkonce.d.*)
+
+.rela.data
+ *(.rela.data.rela.data.*.rela.gnu.linkonce.d.*)
+
+.rel.tdata
+ *(.rel.tdata.rel.tdata.*.rel.gnu.linkonce.td.*)
+
+.rela.tdata
+ *(.rela.tdata.rela.tdata.*.rela.gnu.linkonce.td.*)
+
+.rel.tbss
+ *(.rel.tbss.rel.tbss.*.rel.gnu.linkonce.tb.*)
+
+.rela.tbss
+ *(.rela.tbss.rela.tbss.*.rela.gnu.linkonce.tb.*)
+
+.rel.ctors
+ *(.rel.ctors)
+
+.rela.ctors
+ *(.rela.ctors)
+
+.rel.dtors
+ *(.rel.dtors)
+
+.rela.dtors
+ *(.rela.dtors)
+
+.rel.got
+ *(.rel.got)
+
+.rela.got
+ *(.rela.got)
+
+.rel.bss
+ *(.rel.bss.rel.bss.*.rel.gnu.linkonce.b.*)
+
+.rela.bss
+ *(.rela.bss.rela.bss.*.rela.gnu.linkonce.b.*)
+
+.rel.plt
+ *(.rel.plt)
+
+.rela.plt
+ *(.rela.plt)
+
+.init
+ *(.init)
+
+.plt
+ *(.plt)
+
+.text           0x000000000000c800     0x1ea4
+ *(.text.stub.text.*.gnu.linkonce.t.*)
+ .text          0x000000000000c800       0xdd obj/head.o
+                0x000000000000c800                startup_32
+ *fill*         0x000000000000c8dd 0x80a458000000003 90909090
+ .text          0x000000000000c8e0      0xa5e obj/main.o
+                0x000000000000c8e0                c_start
+ *fill*         0x000000000000d33e 0x80a458000000002 90909090
+ .text          0x000000000000d340      0x34a obj/common_func.o
+                0x000000000000d3b4                init_gate
+                0x000000000000d478                memcpy
+                0x000000000000d5a0                print_str
+                0x000000000000d340                init_descriptor
+                0x000000000000d42c                panic
+                0x000000000000d44c                memset
+                0x000000000000d5e4                print_hex
+                0x000000000000d4ac                print_chr
+                0x000000000000d66c                select2index
+ *fill*         0x000000000000d68a 0x80a458000000002 90909090
+ .text          0x000000000000d68c      0x3f0 obj/asm.o
+                0x000000000000d962                _IH_irq06
+                0x000000000000d781                _EH_undefined_op
+                0x000000000000d7a7                _EH_page_error
+                0x000000000000d7d1                _IH_sys_call
+                0x000000000000d9e3                _IH_irq12
+                0x000000000000da0b                _IH_irq14
+                0x000000000000d7a3                _EH_general_protect_error
+                0x000000000000d934                _IH_irq04
+                0x000000000000d797                _EH_invalid_tss
+                0x000000000000d769                _EH_not_mask_intr
+                0x000000000000d9a7                _IH_irq09
+                0x000000000000da4c                _move_to_user_mode
+                0x000000000000d79f                _EH_stack_error
+                0x000000000000d77b                _EH_break_limit
+                0x000000000000d763                _EH_debug_error
+                0x000000000000d775                _EH_over_flow
+                0x000000000000d990                _IH_irq08
+                0x000000000000d68c                _setup_paging
+                0x000000000000d849                _IH_irq00
+                0x000000000000d75d                _EH_divide_error
+                0x000000000000d7c1                _EH_simd_float_error
+                0x000000000000d7ab                _EH_reserve15
+                0x000000000000d906                _IH_irq02
+                0x000000000000d7b7                _EH_align_check
+                0x000000000000d791                _EH_coproc_break_limit
+                0x000000000000d979                _IH_irq07
+                0x000000000000da1f                _IH_irq15
+                0x000000000000d6da                out_byte
+                0x000000000000d79b                _EH_no_seg
+                0x000000000000d76f                _EH_debug_break
+                0x000000000000d8a8                _IH_irq01
+                0x000000000000d7bb                _EH_machine_check
+                0x000000000000d91d                _IH_irq03
+                0x000000000000d9bb                _IH_irq10
+                0x000000000000d6eb                in_byte
+                0x000000000000d787                _EH_no_coproc
+                0x000000000000d7b1                _EH_float_error
+                0x000000000000d78d                _EH_double_error
+                0x000000000000d94b                _IH_irq05
+                0x000000000000d9f7                _IH_irq13
+                0x000000000000d754                _lidt
+                0x000000000000d744                _send_end_of_intr
+                0x000000000000d9cf                _IH_irq11
+ *fill*         0x000000000000da7c 0x80a458000000004 90909090
+ .text          0x000000000000da80       0x9e obj/syscall.o
+                0x000000000000da80                execute_sys_call
+ *fill*         0x000000000000db1e 0x80a458000000002 90909090
+ .text          0x000000000000db20       0x54 obj/test_proc.o
+                0x000000000000db20                proc_A
+                0x000000000000db48                proc_B
+ .text          0x000000000000db74       0x30 obj/api.o
+                0x000000000000db93                _sleep
+                0x000000000000db74                _get_ticks
+                0x000000000000db82                _set_ticks
+ *fill*         0x000000000000dba4 0x80a45800000000c 90909090
+ .text          0x000000000000dbb0      0x332 obj/schedule.o
+                0x000000000000ddc4                handle_interrupt
+                0x000000000000dbb0                schedule
+                0x000000000000de04                handle_exception
+ *fill*         0x000000000000dee2 0x80a45800000000e 90909090
+ .text          0x000000000000def0      0x3e3 obj/keyboard.o
+                0x000000000000e02c                keyboard_do_task
+                0x000000000000dff4                keyboard_intr_handle
+ *fill*         0x000000000000e2d3 0x80a45800000000d 90909090
+ .text          0x000000000000e2e0      0x2b3 obj/keyboard_buf.o
+                0x000000000000e344                kbbuf_IsEmpty
+                0x000000000000e3e4                kbbuf_Capability
+                0x000000000000e384                kbbuf_IsFull
+                0x000000000000e2e0                kbbuf_MemAttach
+                0x000000000000e464                kbbuf_PutScanCode
+                0x000000000000e504                kbbuf_GetScanCode
+ *fill*         0x000000000000e593 0x80a45800000000d 90909090
+ .text          0x000000000000e5a0       0x53 obj/task.o
+                0x000000000000e5d4                task_set_busy
+                0x000000000000e5a0                do_task
+                0x000000000000e5e4                task_is_busy
+ *fill*         0x000000000000e5f3 0x80a458000000001 90909090
+ .text          0x000000000000e5f4       0xb0 obj/tty.o
+                0x000000000000e5f4                tty_scroll_screen
+ *(.gnu.warning)
+
+.fini
+ *(.fini)
+                0x000000000000e6a4                PROVIDE (__etext, .)
+                0x000000000000e6a4                PROVIDE (_etext, .)
+                0x000000000000e6a4                PROVIDE (etext, .)
+
+.rodata         0x000000000000e6c0      0x59d
+ *(.rodata.rodata.*.gnu.linkonce.r.*)
+ .rodata        0x000000000000e6c0       0x43 obj/main.o
+ *fill*         0x000000000000e703 0x80a4a880000001d 00
+ .rodata        0x000000000000e720       0x8e obj/schedule.o
+ *fill*         0x000000000000e7ae 0x80a4a8800000002 00
+ .rodata        0x000000000000e7b0      0x4ad obj/keyboard.o
+
+.rodata1
+ *(.rodata1)
+
+.eh_frame_hdr
+ *(.eh_frame_hdr)
+                0x000000000000ec5d                . = .
+                0x000000000000ec60                . = ALIGN (0x4)
+                0x000000000000ec60                PROVIDE (__preinit_array_start, .)
+
+.preinit_array
+ *(.preinit_array)
+                0x000000000000ec60                PROVIDE (__preinit_array_end, .)
+                0x000000000000ec60                PROVIDE (__init_array_start, .)
+
+.init_array
+ *(.init_array)
+                0x000000000000ec60                PROVIDE (__init_array_end, .)
+                0x000000000000ec60                PROVIDE (__fini_array_start, .)
+
+.fini_array
+ *(.fini_array)
+                0x000000000000ec60                PROVIDE (__fini_array_end, .)
+
+.data           0x000000000000ec60      0x2b4
+ *(.data.data.*.gnu.linkonce.d.*)
+ .data          0x000000000000ec60        0x4 obj/head.o
+ .data          0x000000000000ec64        0x5 obj/asm.o
+ *fill*         0x000000000000ec69 0x80a518c00000003 00
+ .data          0x000000000000ec6c       0x10 obj/global.o
+                0x000000000000ec6c                g_scr_line
+                0x000000000000ec70                g_current
+                0x000000000000ec74                g_ticks
+                0x000000000000ec6d                g_scr_colume
+ .data          0x000000000000ec7c      0x284 obj/schedule.o
+ .data          0x000000000000ef00        0xe obj/keyboard.o
+ *fill*         0x000000000000ef0e 0x80a518c00000002 00
+ .data          0x000000000000ef10        0x4 obj/task.o
+
+.data1
+ *(.data1)
+
+.tdata
+ *(.tdata.tdata.*.gnu.linkonce.td.*)
+
+.tbss
+ *(.tbss.tbss.*.gnu.linkonce.tb.*)
+ *(.tcommon)
+
+.eh_frame
+ *(.eh_frame)
+
+.gcc_except_table
+ *(.gcc_except_table)
+
+.dynamic
+ *(.dynamic)
+
+.ctors
+ *crtbegin.o(.ctors)
+ *(EXCLUDE_FILE ( *crtend.o).ctors)
+ *(SORT(.ctors.*))
+ *(.ctors)
+
+.dtors
+ *crtbegin.o(.dtors)
+ *(EXCLUDE_FILE ( *crtend.o).dtors)
+ *(SORT(.dtors.*))
+ *(.dtors)
+
+.jcr
+ *(.jcr)
+
+.got
+ *(.got.plt)
+ *(.got)
+                0x000000000000ef14                _edata = .
+                0x000000000000ef14                PROVIDE (edata, .)
+                0x000000000000ef14                __bss_start = .
+
+.bss            0x000000000000ef20      0xb28
+ *(.dynbss)
+ *(.bss.bss.*.gnu.linkonce.b.*)
+ .bss           0x000000000000ef20       0x70 obj/keyboard.o
+ *(COMMON)
+ *fill*         0x000000000000ef90 0x80a5eb000000010 00
+ COMMON         0x000000000000efa0      0xaa6 obj/global.o
+                                          0x0 (size before relaxing)
+                0x000000000000efa0                g_tss_selector
+                0x000000000000efa4                g_syscall_param_ecx
+                0x000000000000efa8                g_idt_selector
+                0x000000000000efac                g_syscall_param_ebx
+                0x000000000000efc0                g_procs
+                0x000000000000f160                g_tss
+                0x000000000000f1c8                g_idtr48
+                0x000000000000f1d0                g_syscall_param_edx
+                0x000000000000f1e0                g_idt
+                0x000000000000f9d8                g_kernel_stack_selector
+                0x000000000000f9da                g_gdtr48
+                0x000000000000f9e0                g_kernel_gs_selector
+                0x000000000000f9e2                g_kernel_data_selector
+                0x000000000000fa00                g_gdt
+                0x000000000000fa40                g_syscall_param_eax
+                0x000000000000fa44                g_kernel_code_selector
+                0x000000000000fa48                . = ALIGN (0x4)
+ *fill*         0x000000000000fa46 0x80a5eb000000002 00
+                0x000000000000fa48                . = ALIGN (0x4)
+                0x000000000000fa48                _end = .
+                0x000000000000fa48                PROVIDE (end, .)
+
+.stab
+ *(.stab)
+
+.stabstr
+ *(.stabstr)
+
+.stab.excl
+ *(.stab.excl)
+
+.stab.exclstr
+ *(.stab.exclstr)
+
+.stab.index
+ *(.stab.index)
+
+.stab.indexstr
+ *(.stab.indexstr)
+
+.comment        0x0000000000000000      0x17c
+ *(.comment)
+ .comment       0x0000000000000000       0x26 obj/main.o
+ .comment       0x0000000000000026       0x26 obj/common_func.o
+ .comment       0x000000000000004c       0x26 obj/global.o
+ .comment       0x0000000000000072       0x26 obj/syscall.o
+ .comment       0x0000000000000098       0x26 obj/test_proc.o
+ .comment       0x00000000000000be       0x26 obj/schedule.o
+ .comment       0x00000000000000e4       0x26 obj/keyboard.o
+ .comment       0x000000000000010a       0x26 obj/keyboard_buf.o
+ .comment       0x0000000000000130       0x26 obj/task.o
+ .comment       0x0000000000000156       0x26 obj/tty.o
+
+.debug
+ *(.debug)
+
+.line
+ *(.line)
+
+.debug_srcinfo
+ *(.debug_srcinfo)
+
+.debug_sfnames
+ *(.debug_sfnames)
+
+.debug_aranges
+ *(.debug_aranges)
+
+.debug_pubnames
+ *(.debug_pubnames)
+
+.debug_info
+ *(.debug_info.gnu.linkonce.wi.*)
+
+.debug_abbrev
+ *(.debug_abbrev)
+
+.debug_line
+ *(.debug_line)
+
+.debug_frame
+ *(.debug_frame)
+
+.debug_str
+ *(.debug_str)
+
+.debug_loc
+ *(.debug_loc)
+
+.debug_macinfo
+ *(.debug_macinfo)
+
+.debug_weaknames
+ *(.debug_weaknames)
+
+.debug_funcnames
+ *(.debug_funcnames)
+
+.debug_typenames
+ *(.debug_typenames)
+
+.debug_varnames
+ *(.debug_varnames)
+OUTPUT(./bin/kernel.bin binary)
+
+.note           0x0000000000000000       0xc8
+ .note          0x0000000000000000       0x14 obj/main.o
+ .note          0x0000000000000014       0x14 obj/common_func.o
+ .note          0x0000000000000028       0x14 obj/global.o
+ .note          0x000000000000003c       0x14 obj/syscall.o
+ .note          0x0000000000000050       0x14 obj/test_proc.o
+ .note          0x0000000000000064       0x14 obj/schedule.o
+ .note          0x0000000000000078       0x14 obj/keyboard.o
+ .note          0x000000000000008c       0x14 obj/keyboard_buf.o
+ .note          0x00000000000000a0       0x14 obj/task.o
+ .note          0x00000000000000b4       0x14 obj/tty.o

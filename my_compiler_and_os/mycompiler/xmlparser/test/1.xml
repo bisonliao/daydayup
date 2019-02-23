@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="GB2312" standalone='no'?>
+<PayInst xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="PayInst.xsd"><_ID>&lt2000000000001435&gt</_ID>
+<Date>2005-01-07</Date>
+<Amount/>
+<PayBankCode/>
+<RecvTreasuryCode>&lt&amp&gt&apos&quot&&</RecvTreasuryCode>
+<SubjectCode>subj</SubjectCode>
+<TaxReturns><TaxReturn><No>22345682</No>
+</TaxReturn></TaxReturns></PayInst>

@@ -1,0 +1,766 @@
+Archive member included because of file (symbol)
+
+obj/libfs.a(buffer.o)         obj/syscall.o (buffer_lock)
+obj/libfs.a(inode.o)          obj/libfs.a(buffer.o) (inode_init)
+obj/libfs.a(namei.o)          obj/syscall_entry.o (sys_lseek)
+obj/libfs.a(truncate.o)       obj/libfs.a(namei.o) (truncate)
+obj/libcommon.a(common_func.o)
+                              obj/tool.o (int_to_hex)
+obj/libcommon.a(cycle_buf.o)  obj/keyboard.o (cycle_buf_MemAttach)
+obj/libcommon.a(hash.o)       obj/libfs.a(buffer.o) (hash_init)
+
+Allocating common symbols
+Common symbol       size              file
+
+g_syscall_param_ecx
+                    0x4               obj/global.o
+RxReadPtrOffset     0x4               obj/rtl8139.o
+g_syscall_param_ebx
+                    0x4               obj/global.o
+g_idtr48            0x6               obj/global.o
+g_syscall_param_edx
+                    0x4               obj/global.o
+g_idt               0x7f8             obj/global.o
+g_syscall_param_ds  0x4               obj/global.o
+g_hd_param          0x10              obj/global.o
+RxBufferOriginal    0x4               obj/rtl8139.o
+IOBase              0x4               obj/rtl8139.o
+pLeadingReadPacket  0x4               obj/rtl8139.o
+g_gdtr48            0x6               obj/global.o
+g_file_table        0x3e8             obj/global.o
+INTR                0x4               obj/rtl8139.o
+g_krnl_stack        0x4000            obj/global.o
+TxHwFinishPtr       0x1               obj/rtl8139.o
+TxHwSetupPtr        0x1               obj/rtl8139.o
+RxBuffer            0x4               obj/rtl8139.o
+Irq                 0x4               obj/rtl8139.o
+g_uptime            0x4               obj/global.o
+TxBuffer            0x640             obj/rtl8139.o
+RxSpace             0x47d0            obj/rtl8139.o
+TxHwFreeDesc        0x1               obj/rtl8139.o
+directvideo         0x4               obj/rtl8139.o
+g_gdt               0x100             obj/global.o
+Buffer              0x4               obj/rtl8139.o
+RxBufferPhysicalAddress
+                    0x4               obj/rtl8139.o
+g_syscall_param_eax
+                    0x4               obj/global.o
+PhysicalAddrBuffer  0x4               obj/rtl8139.o
+TxDesc              0x40              obj/rtl8139.o
+g_startup_time      0x4               obj/global.o
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+*default*        0x0000000000000000 0xffffffffffffffff
+
+Linker script and memory map
+
+Address of section .text set to 0xc800
+LOAD obj/head.o
+LOAD obj/main.o
+LOAD obj/asm.o
+LOAD obj/syscall.o
+LOAD obj/test_proc.o
+LOAD obj/api.o
+LOAD obj/schedule.o
+LOAD obj/keyboard.o
+LOAD obj/task.o
+LOAD obj/proc_paging.o
+LOAD obj/tty.o
+LOAD obj/syscall_entry.o
+LOAD obj/hd.o
+LOAD obj/hd_asm.o
+LOAD obj/libfs.a
+LOAD obj/global.o
+LOAD obj/time.o
+LOAD obj/tool.o
+LOAD obj/packet.o
+LOAD obj/rtl8139.o
+LOAD obj/dwio.o
+LOAD obj/libcommon.a
+LOAD obj/redefine.o
+                0x0000000008048000                PROVIDE (__executable_start, 0x8048000)
+                0x0000000008048000                . = (0x8048000 + SIZEOF_HEADERS)
+
+.interp
+ *(.interp)
+
+.hash
+ *(.hash)
+
+.dynsym
+ *(.dynsym)
+
+.dynstr
+ *(.dynstr)
+
+.gnu.version
+ *(.gnu.version)
+
+.gnu.version_d
+ *(.gnu.version_d)
+
+.gnu.version_r
+ *(.gnu.version_r)
+
+.rel.dyn
+ *(.rel.init)
+ *(.rel.text .rel.text.* .rel.gnu.linkonce.t.*)
+ *(.rel.fini)
+ *(.rel.rodata .rel.rodata.* .rel.gnu.linkonce.r.*)
+ *(.rel.data.rel.ro* .rel.gnu.linkonce.d.rel.ro.*)
+ *(.rel.data .rel.data.* .rel.gnu.linkonce.d.*)
+ *(.rel.tdata .rel.tdata.* .rel.gnu.linkonce.td.*)
+ *(.rel.tbss .rel.tbss.* .rel.gnu.linkonce.tb.*)
+ *(.rel.ctors)
+ *(.rel.dtors)
+ *(.rel.got)
+ *(.rel.bss .rel.bss.* .rel.gnu.linkonce.b.*)
+
+.rela.dyn
+ *(.rela.init)
+ *(.rela.text .rela.text.* .rela.gnu.linkonce.t.*)
+ *(.rela.fini)
+ *(.rela.rodata .rela.rodata.* .rela.gnu.linkonce.r.*)
+ *(.rela.data .rela.data.* .rela.gnu.linkonce.d.*)
+ *(.rela.tdata .rela.tdata.* .rela.gnu.linkonce.td.*)
+ *(.rela.tbss .rela.tbss.* .rela.gnu.linkonce.tb.*)
+ *(.rela.ctors)
+ *(.rela.dtors)
+ *(.rela.got)
+ *(.rela.bss .rela.bss.* .rela.gnu.linkonce.b.*)
+
+.rel.plt
+ *(.rel.plt)
+
+.rela.plt
+ *(.rela.plt)
+
+.init
+ *(.init)
+
+.plt
+ *(.plt)
+
+.text           0x000000000000c800     0x9ac6
+ *(.text .stub .text.* .gnu.linkonce.t.*)
+ .text          0x000000000000c800       0xc6 obj/head.o
+                0x000000000000c800                startup_32
+ *fill*         0x000000000000c8c6        0xa 90909090
+ .text          0x000000000000c8d0      0xc1d obj/main.o
+                0x000000000000cb10                c_start
+                0x000000000000c8d0                create_first_user_proc
+ *fill*         0x000000000000d4ed        0x3 90909090
+ .text          0x000000000000d4f0      0x590 obj/asm.o
+                0x000000000000da72                _get_esp
+                0x000000000000d93c                _IH_irq06
+                0x000000000000d64a                _EH_undefined_op
+                0x000000000000d670                _EH_page_error
+                0x000000000000d69c                _IH_sys_call
+                0x000000000000d956                _IH_irq12
+                0x000000000000d95e                _IH_irq14
+                0x000000000000d66c                _EH_general_protect_error
+                0x000000000000d934                _IH_irq04
+                0x000000000000d99f                _switch
+                0x000000000000d660                _EH_invalid_tss
+                0x000000000000d632                _EH_not_mask_intr
+                0x000000000000d94a                _IH_irq09
+                0x000000000000d575                out_word
+                0x000000000000d668                _EH_stack_error
+                0x000000000000d644                _EH_break_limit
+                0x000000000000d62c                _EH_debug_error
+                0x000000000000d53d                debug_label
+                0x000000000000d63e                _EH_over_flow
+                0x000000000000d944                _IH_irq08
+                0x000000000000d4f0                _setup_paging
+                0x000000000000d8c2                _IH_irq00
+                0x000000000000da78                _get_eip
+                0x000000000000d626                _EH_divide_error
+                0x000000000000d68a                _EH_simd_float_error
+                0x000000000000d674                _EH_reserve15
+                0x000000000000da61                _set_cr3
+                0x000000000000d69a                _move_to_process
+                0x000000000000d92c                _IH_irq02
+                0x000000000000d680                _EH_align_check
+                0x000000000000d65a                _EH_coproc_break_limit
+                0x000000000000d619                _nop
+                0x000000000000d940                _IH_irq07
+                0x000000000000d997                _IH_irq15
+                0x000000000000d55a                out_byte
+                0x000000000000d664                _EH_no_seg
+                0x000000000000d638                _EH_debug_break
+                0x000000000000d8fc                _IH_irq01
+                0x000000000000d684                _EH_machine_check
+                0x000000000000d930                _IH_irq03
+                0x000000000000d94e                _IH_irq10
+                0x000000000000d591                in_byte
+                0x000000000000d650                _EH_no_coproc
+                0x000000000000da54                _ltr
+                0x000000000000d67a                _EH_float_error
+                0x000000000000d5ab                in_word
+                0x000000000000d656                _EH_double_error
+                0x000000000000d938                _IH_irq05
+                0x000000000000d95a                _IH_irq13
+                0x000000000000da6e                _get_cr3
+                0x000000000000d61d                _lidt
+                0x000000000000d952                _IH_irq11
+ .text          0x000000000000da80      0xf29 obj/syscall.o
+                0x000000000000e270                load_proc_from_fs
+                0x000000000000e830                sys_test
+                0x000000000000e9a0                sys_time
+                0x000000000000dfc0                sys_fork
+                0x000000000000dac0                sys_get_ticks_lo
+                0x000000000000da80                execute_sys_call
+                0x000000000000daf0                sys_sleep
+                0x000000000000e910                sys_cout
+                0x000000000000e860                sys_hd
+                0x000000000000dad0                sys_get_ticks_hi
+                0x000000000000e3e0                sys_exec
+                0x000000000000e850                sys_sync
+                0x000000000000db40                sys_wait
+                0x000000000000df20                sys_exit
+                0x000000000000e950                sys_cin
+ *fill*         0x000000000000e9a9        0x7 90909090
+ .text          0x000000000000e9b0      0x28e obj/test_proc.o
+                0x000000000000eab0                format
+                0x000000000000e9f0                proc_A
+                0x000000000000e9b0                proc_B
+ *fill*         0x000000000000ec3e        0x2 90909090
+ .text          0x000000000000ec40      0x2eb obj/api.o
+                0x000000000000ee44                _cout
+                0x000000000000ed3c                _mkdir
+                0x000000000000ec8b                _sleep
+                0x000000000000ed21                _test
+                0x000000000000ed5d                _rmdir
+                0x000000000000eea7                _exec
+                0x000000000000ed7e                _readdir
+                0x000000000000ee65                _cin
+                0x000000000000ed9f                _open
+                0x000000000000ec40                _get_ticks
+                0x000000000000ee02                _rmfile
+                0x000000000000ef0a                _wait
+                0x000000000000ee23                _lseek
+                0x000000000000ec58                _time
+                0x000000000000ec70                _set_ticks
+                0x000000000000eee9                _access
+                0x000000000000ece8                _hd
+                0x000000000000ee86                _fork
+                0x000000000000eca6                _write
+                0x000000000000ed09                _sync
+                0x000000000000ede1                _mkfile
+                0x000000000000ecc7                _read
+                0x000000000000eec8                _exit
+                0x000000000000edc0                _close
+ *fill*         0x000000000000ef2b        0x5 90909090
+ .text          0x000000000000ef30      0x3dc obj/schedule.o
+                0x000000000000f2b0                sleep_on
+                0x000000000000f070                schedule
+                0x000000000000efd0                handle_exception
+                0x000000000000ef30                wake_up
+                0x000000000000ef50                handle_timer_interrupt
+ *fill*         0x000000000000f30c        0x4 90909090
+ .text          0x000000000000f310      0x4c2 obj/keyboard.o
+                0x000000000000f740                keyboard_init
+                0x000000000000f310                keyboard_do_task
+                0x000000000000f640                keyboard_read
+                0x000000000000f6c0                keyboard_intr_handle
+ *fill*         0x000000000000f7d2        0xe 90909090
+ .text          0x000000000000f7e0       0xb6 obj/task.o
+                0x000000000000f7e0                do_task
+ *fill*         0x000000000000f896        0xa 90909090
+ .text          0x000000000000f8a0      0x106 obj/proc_paging.o
+                0x000000000000f900                setup_paging_for_proc
+                0x000000000000f8c0                proc_paging_init
+                0x000000000000f8a0                get_cr3_for_proc
+ *fill*         0x000000000000f9a6        0xa 90909090
+ .text          0x000000000000f9b0       0x85 obj/tty.o
+                0x000000000000f9b0                tty_scroll_screen
+ *fill*         0x000000000000fa35        0x3 90909090
+ *fill*         0x000000000000fa38        0x8 90909090
+ .text          0x000000000000fa40      0x6f9 obj/hd.o
+                0x00000000000100d0                hd_add_request
+                0x000000000000fb00                hd_init
+                0x000000000000fb90                hd_read_sync
+ *fill*         0x0000000000010139        0x3 90909090
+ .text          0x000000000001013c      0x101 obj/hd_asm.o
+ *fill*         0x000000000001023d        0x3 90909090
+ .text          0x0000000000010240      0xa10 obj/libfs.a(buffer.o)
+                0x0000000000010910                buffer_init
+                0x00000000000102d0                buffer_lock
+                0x0000000000010c20                fs_init
+                0x0000000000010560                buffer_release
+                0x0000000000010590                free_block
+                0x0000000000010c00                buffer_sync
+                0x0000000000010450                buffer_read
+                0x00000000000106c0                alloc_block
+ .text          0x0000000000010c50      0x781 obj/libfs.a(inode.o)
+                0x0000000000010cc0                free_inode
+                0x0000000000010c60                iget
+                0x00000000000113a0                create_block
+                0x0000000000010d90                alloc_inode
+                0x0000000000010c50                inode_init
+                0x00000000000113c0                bmap
+ *fill*         0x00000000000113d1        0xf 90909090
+ .text          0x00000000000113e0     0x15d3 obj/libfs.a(namei.o)
+                0x0000000000011a90                sys_close
+                0x00000000000114c0                sys_lseek
+                0x0000000000012840                sys_mkdir
+                0x0000000000011cb0                namei
+                0x00000000000120a0                sys_access
+                0x00000000000119c0                sys_read
+                0x00000000000113e0                pathname_split
+                0x0000000000011f90                sys_readdir
+                0x0000000000011e10                sys_open
+                0x0000000000011620                sys_write
+                0x0000000000011860                file_read
+                0x0000000000012110                sys_rmfile
+                0x0000000000011440                subdir
+                0x0000000000012300                sys_rmdir
+                0x00000000000126d0                sys_mkfile
+ *fill*         0x00000000000129b3        0xd 90909090
+ .text          0x00000000000129c0      0x1a6 obj/libfs.a(truncate.o)
+                0x0000000000012ae0                truncate
+ *fill*         0x0000000000012b66        0x2 90909090
+ *fill*         0x0000000000012b68        0x8 90909090
+ .text          0x0000000000012b70      0x33e obj/time.o
+                0x0000000000012be0                current_time
+                0x0000000000012c00                up_time
+                0x0000000000012c10                localtime
+                0x0000000000012b70                kernel_mktime
+                0x0000000000012d10                time_init
+ *fill*         0x0000000000012eae        0x2 90909090
+ .text          0x0000000000012eb0      0x3b9 obj/tool.o
+                0x0000000000013100                init_gate
+                0x0000000000012ff0                paddr_to_user_space_vaddr
+                0x0000000000012f60                print_str
+                0x0000000000013170                init_descriptor
+                0x0000000000012fa0                panic
+                0x0000000000013080                printk
+                0x00000000000130d0                print_hex
+                0x0000000000012eb0                print_chr
+                0x00000000000131e0                user_space_vaddr_to_paddr
+                0x0000000000012f90                select2index
+ *fill*         0x0000000000013269        0x7 90909090
+ .text          0x0000000000013270       0x57 obj/packet.o
+                0x0000000000013270                CopyFromPacketToBuffer
+ *fill*         0x00000000000132c7        0x9 90909090
+ .text          0x00000000000132d0      0x74a obj/rtl8139.o
+                0x0000000000013700                InitHardware
+                0x00000000000138e0                NewFunction
+                0x0000000000013410                CheckTSDStatus
+                0x0000000000013390                NextDesc
+                0x0000000000013680                SendPacket
+                0x0000000000013400                UnloadDriver
+                0x0000000000013660                SendPacket2
+                0x00000000000132f0                InitSoftware
+                0x00000000000135f0                IssueCMD
+                0x00000000000133b0                ReadPacket
+                0x0000000000013860                LoadDriver
+                0x00000000000132d0                ComputeInterrupt
+                0x0000000000013460                TxInterruptHandler
+                0x0000000000013510                RxInterruptHandler
+                0x00000000000137a0                FindIOIRQ
+                0x00000000000134c0                CopyPacket
+                0x00000000000133c0                PacketOK
+ *fill*         0x0000000000013a1a        0x2 90909090
+ .text          0x0000000000013a1c        0xe obj/dwio.o
+                0x0000000000013a1c                _delay10us
+                0x0000000000013a29                _caleepcrc
+ *fill*         0x0000000000013a2a        0x2 90909090
+ .text          0x0000000000013a2c       0xf3 obj/libcommon.a(common_func.o)
+                0x0000000000013aa7                div_uint64
+                0x0000000000013a2c                int_to_hex
+ *fill*         0x0000000000013b1f        0x1 90909090
+ .text          0x0000000000013b20      0x27d obj/libcommon.a(cycle_buf.o)
+                0x0000000000013b20                cycle_buf_MemAttach
+                0x0000000000013be3                cycle_buf_IsFull
+                0x0000000000013ba1                cycle_buf_IsEmpty
+                0x0000000000013ce1                cycle_buf_pop
+                0x0000000000013c39                cycle_buf_push
+ *fill*         0x0000000000013d9d        0x3 90909090
+ .text          0x0000000000013da0     0x17b8 obj/libcommon.a(hash.o)
+                0x00000000000154d4                hash_insert
+                0x000000000001515a                hash_find
+                0x000000000001481e                CHash::MemAttach(void*, unsigned int, bool)
+                0x0000000000014c40                CHash::Dump()
+                0x000000000001528e                hash_update
+                0x0000000000014514                CHash::InsertFreeList(int)
+                0x0000000000014f3e                hash_mem_attach
+                0x0000000000014ba2                CHash::Exist(unsigned char const*, unsigned int)
+                0x0000000000014f9c                hash_find2
+                0x000000000001421c                CHash::ResetNode(int)
+                0x000000000001435a                CHash::GetFreeNode(int&)
+                0x0000000000014ed6                hash_init
+                0x0000000000014f74                hash_remove
+                0x000000000001477c                CHash::CHash(unsigned int, unsigned int, unsigned int, unsigned int (*)(unsigned char const*, unsigned int), bool (*)(unsigned char const*, unsigned int, unsigned char const*, unsigned int), int (*)(unsigned char const*, unsigned int, unsigned char const*, unsigned int))
+                0x0000000000015012                __gxx_personality_v0
+                0x0000000000014000                CHash::ScanUsedNode(void (*)(unsigned char const*, unsigned int, unsigned char const*, unsigned int))
+                0x00000000000152c4                CHash::Insert(unsigned char const*, unsigned int, unsigned char const*, unsigned int)
+                0x0000000000013da0                operator new(unsigned int, void*)
+                0x0000000000014c46                CHash::Verify()
+                0x00000000000149be                CHash::Remove(unsigned char const*, unsigned int)
+                0x0000000000014634                CHash::Ptr2Node(void*)
+                0x000000000001425a                CHash::RemoveNodeFromFreeList(int)
+                0x0000000000013dd2                CHash::Node2Ptr(int)
+                0x0000000000015190                CHash::Update(unsigned char const*, unsigned int, unsigned char const*, unsigned int)
+                0x0000000000013da8                CHash::GetSizeOfHashNode()
+                0x0000000000014ff2                hash_ScanUsedNode
+                0x0000000000015018                CHash::Find(unsigned char const*, unsigned int, unsigned char*, unsigned int*)
+                0x00000000000148b0                CHash::hash(unsigned char const*, unsigned int)
+                0x00000000000148f8                CHash::Find(int&, int&, unsigned char const*, unsigned int)
+                0x0000000000014ad2                CHash::Find(unsigned char const*, unsigned int, void**)
+                0x000000000001407a                CHash::RemoveNodeFromUsedList(int)
+                0x0000000000013dc0                CHash::GetSizeOfHashHead()
+                0x000000000001457a                CHash::Initialize()
+                0x00000000000146da                CHash::CHash(unsigned int, unsigned int, unsigned int, unsigned int (*)(unsigned char const*, unsigned int), bool (*)(unsigned char const*, unsigned int, unsigned char const*, unsigned int), int (*)(unsigned char const*, unsigned int, unsigned char const*, unsigned int))
+                0x0000000000013f4c                CHash::InsertBucketList(int, int)
+                0x000000000001550a                CHash::KeyEqual(unsigned char const*, unsigned int, unsigned char const*, unsigned int)
+                0x0000000000014188                CHash::InsertUsedList(int)
+                0x0000000000014fca                hash_exist
+                0x0000000000013e32                CHash::RemoveNodeFromBucketList(int)
+ .text._ZN5CHash9CHashNodeC1Ev
+                0x0000000000015558       0x4a obj/libcommon.a(hash.o)
+                0x0000000000015558                CHash::CHashNode::CHashNode()
+ *fill*         0x00000000000155a2        0x2 90909090
+ .text          0x00000000000155a4      0xd22 obj/redefine.o
+                0x000000000001569e                strcpy
+                0x0000000000015847                printf
+                0x0000000000015e7d                vsprintf
+                0x0000000000015802                snprintf
+                0x000000000001572d                memcpy
+                0x00000000000158ac                strtol
+                0x0000000000015a14                strtod
+                0x00000000000155dc                strncmp
+                0x00000000000156dc                strncpy
+                0x0000000000015791                memcmp
+                0x0000000000015672                memset
+                0x00000000000155a4                strlen
+ *(.text.*personality*)
+ *(.gnu.warning)
+
+.fini
+ *(.fini)
+                0x00000000000162c6                PROVIDE (__etext, .)
+                0x00000000000162c6                PROVIDE (_etext, .)
+                0x00000000000162c6                PROVIDE (etext, .)
+
+.rodata         0x00000000000162e0      0xc98
+ *(.rodata .rodata.* .gnu.linkonce.r.*)
+ .rodata.str1.1
+                0x00000000000162e0        0x8 obj/main.o
+ .rodata.str1.4
+                0x00000000000162e8       0x37 obj/main.o
+ .rodata.str1.1
+                0x000000000001631f      0x11f obj/syscall.o
+ *fill*         0x000000000001643e        0x2 00
+ .rodata.str1.4
+                0x0000000000016440       0x82 obj/syscall.o
+ .rodata.str1.1
+                0x00000000000164c2       0x4d obj/test_proc.o
+ .rodata.str1.1
+                0x000000000001650f       0x7c obj/schedule.o
+ .rodata.str1.1
+                0x000000000001658b       0x55 obj/keyboard.o
+ .rodata.str1.4
+                0x00000000000165e0       0x40 obj/keyboard.o
+ .rodata        0x0000000000016620      0x42c obj/keyboard.o
+ .rodata.str1.4
+                0x0000000000016a4c       0x44 obj/hd.o
+ .rodata.str1.1
+                0x0000000000016a90       0x6f obj/hd.o
+ .rodata.str1.1
+                0x0000000000016aff       0xcb obj/libfs.a(buffer.o)
+ *fill*         0x0000000000016bca        0x2 00
+ .rodata.str1.4
+                0x0000000000016bcc      0x10a obj/libfs.a(buffer.o)
+ .rodata.str1.1
+                0x0000000000016cd6       0x4f obj/libfs.a(inode.o)
+ .rodata.str1.1
+                0x0000000000016d25       0x14 obj/libfs.a(namei.o)
+ *fill*         0x0000000000016d39        0x3 00
+ .rodata.str1.4
+                0x0000000000016d3c       0x30 obj/libfs.a(namei.o)
+ .rodata.str1.1
+                0x0000000000016d6c       0x11 obj/time.o
+ *fill*         0x0000000000016d7d        0x3 00
+ .rodata        0x0000000000016d80       0x30 obj/time.o
+ .rodata.str1.1
+                0x0000000000016db0       0x3d obj/tool.o
+ *fill*         0x0000000000016ded        0x3 00
+ .rodata.str1.4
+                0x0000000000016df0       0x23 obj/tool.o
+ .rodata.str1.1
+                0x0000000000016e13       0x2e obj/rtl8139.o
+ *fill*         0x0000000000016e41        0x7 00
+ .rodata        0x0000000000016e48      0x130 obj/redefine.o
+
+.rodata1
+ *(.rodata1)
+
+.eh_frame_hdr
+ *(.eh_frame_hdr)
+
+.eh_frame       0x0000000000016f78      0x1e0
+ *(.eh_frame)
+ .eh_frame      0x0000000000016f78      0x1e0 obj/libcommon.a(hash.o)
+
+.gcc_except_table
+ *(.gcc_except_table .gcc_except_table.*)
+                0x0000000000017158                . = (ALIGN (0x1000) - ((0x1000 - .) & 0xfff))
+                0x0000000000018158                . = (0x1000 DATA_SEGMENT_ALIGN 0x1000)
+
+.eh_frame
+ *(.eh_frame)
+
+.gcc_except_table
+ *(.gcc_except_table .gcc_except_table.*)
+
+.tdata
+ *(.tdata .tdata.* .gnu.linkonce.td.*)
+
+.tbss
+ *(.tbss .tbss.* .gnu.linkonce.tb.*)
+ *(.tcommon)
+
+.preinit_array  0x0000000000018158        0x0
+                0x0000000000018158                PROVIDE (__preinit_array_start, .)
+ *(.preinit_array)
+                0x0000000000018158                PROVIDE (__preinit_array_end, .)
+
+.init_array     0x0000000000018158        0x0
+                0x0000000000018158                PROVIDE (__init_array_start, .)
+ *(SORT(.init_array.*))
+ *(.init_array)
+                0x0000000000018158                PROVIDE (__init_array_end, .)
+
+.fini_array     0x0000000000018158        0x0
+                0x0000000000018158                PROVIDE (__fini_array_start, .)
+ *(.fini_array)
+ *(SORT(.fini_array.*))
+                0x0000000000018158                PROVIDE (__fini_array_end, .)
+
+.ctors
+ *crtbegin*.o(.ctors)
+ *(EXCLUDE_FILE(*crtend*.o) .ctors)
+ *(SORT(.ctors.*))
+ *(.ctors)
+
+.dtors
+ *crtbegin*.o(.dtors)
+ *(EXCLUDE_FILE(*crtend*.o) .dtors)
+ *(SORT(.dtors.*))
+ *(.dtors)
+
+.jcr
+ *(.jcr)
+
+.data.rel.ro
+ *(.data.rel.ro.local* .gnu.linkonce.d.rel.ro.local.*)
+ *(.data.rel.ro* .gnu.linkonce.d.rel.ro.*)
+
+.dynamic
+ *(.dynamic)
+
+.got
+ *(.got)
+                0x0000000000018158                . = (. DATA_SEGMENT_RELRO_END 0xc)
+
+.got.plt
+ *(.got.plt)
+
+.data           0x0000000000018160      0xb68
+ *(.data .data.* .gnu.linkonce.d.*)
+ .data          0x0000000000018160        0xc obj/head.o
+ .data          0x000000000001816c        0xa obj/asm.o
+ *fill*         0x0000000000018176        0x2 00
+ *fill*         0x0000000000018178        0x8 00
+ .data          0x0000000000018180      0x280 obj/schedule.o
+ .data          0x0000000000018400        0x4 obj/task.o
+ .data          0x0000000000018404       0x64 obj/syscall_entry.o
+                0x0000000000018408                g_syscall_entry
+                0x0000000000018404                g_syscall_nr
+ *fill*         0x0000000000018468       0x18 00
+ .data          0x0000000000018480      0x848 obj/global.o
+                0x0000000000018480                g_procs
+ *(.gnu.linkonce.d.*personality*)
+                0x0000000000018cc8                . = ALIGN (0x4)
+                0x0000000000018cc8                __start_data = .
+
+data            0x0000000000018cc8       0x29
+ data           0x0000000000018cc8       0x10 obj/keyboard.o
+ data           0x0000000000018cd8        0x5 obj/hd.o
+ *fill*         0x0000000000018cdd        0x3 00
+ data           0x0000000000018ce0       0x11 obj/global.o
+                0x0000000000018ce0                g_scr_line
+                0x0000000000018cf0                g_hd_sync_flag
+                0x0000000000018ce8                g_ticks
+                0x0000000000018ce1                g_scr_colume
+                0x0000000000018cf1                __stop_data = .
+
+.data1
+ *(.data1)
+                0x0000000000018cf1                _edata = .
+                0x0000000000018cf1                PROVIDE (edata, .)
+                0x0000000000018cf1                __bss_start = .
+
+.bss            0x0000000000018d00     0xa960
+ *(.dynbss)
+ *(.bss .bss.* .gnu.linkonce.b.*)
+ .bss           0x0000000000018d00      0x3e8 obj/test_proc.o
+ .bss           0x00000000000190e8        0x2 obj/schedule.o
+ *fill*         0x00000000000190ea       0x16 00
+ .bss           0x0000000000019100       0xf8 obj/keyboard.o
+ *fill*         0x00000000000191f8        0x8 00
+ .bss           0x0000000000019200      0x160 obj/hd.o
+ .bss           0x0000000000019360      0x2ab obj/libfs.a(buffer.o)
+ *fill*         0x000000000001960b        0x1 00
+ .bss           0x000000000001960c        0x4 obj/libfs.a(inode.o)
+ .bss           0x0000000000019610        0x8 obj/global.o
+                0x0000000000019614                do_hd
+                0x0000000000019610                g_current
+ *fill*         0x0000000000019618        0x8 00
+ .bss           0x0000000000019620      0x400 obj/tool.o
+ .bss           0x0000000000019a20        0x8 obj/rtl8139.o
+                0x0000000000019a24                ByteReceived
+                0x0000000000019a20                PacketReceivedGood
+ *(COMMON)
+ *fill*         0x0000000000019a28       0x18 00
+ COMMON         0x0000000000019a40     0x4d68 obj/global.o
+                0x0000000000019a40                g_syscall_param_ecx
+                0x0000000000019a44                g_syscall_param_ebx
+                0x0000000000019a48                g_idtr48
+                0x0000000000019a50                g_syscall_param_edx
+                0x0000000000019a60                g_idt
+                0x000000000001a258                g_syscall_param_ds
+                0x000000000001a25c                g_hd_param
+                0x000000000001a26c                g_gdtr48
+                0x000000000001a280                g_file_table
+                0x000000000001a680                g_krnl_stack
+                0x000000000001e680                g_uptime
+                0x000000000001e6a0                g_gdt
+                0x000000000001e7a0                g_syscall_param_eax
+                0x000000000001e7a4                g_startup_time
+ *fill*         0x000000000001e7a8       0x18 00
+ COMMON         0x000000000001e7c0     0x4ea0 obj/rtl8139.o
+                0x000000000001e7c0                RxReadPtrOffset
+                0x000000000001e7c4                RxBufferOriginal
+                0x000000000001e7c8                IOBase
+                0x000000000001e7cc                pLeadingReadPacket
+                0x000000000001e7d0                INTR
+                0x000000000001e7d4                TxHwFinishPtr
+                0x000000000001e7d5                TxHwSetupPtr
+                0x000000000001e7d8                RxBuffer
+                0x000000000001e7dc                Irq
+                0x000000000001e7e0                TxBuffer
+                0x000000000001ee20                RxSpace
+                0x00000000000235f0                TxHwFreeDesc
+                0x00000000000235f4                directvideo
+                0x00000000000235f8                Buffer
+                0x00000000000235fc                RxBufferPhysicalAddress
+                0x0000000000023600                PhysicalAddrBuffer
+                0x0000000000023620                TxDesc
+                0x0000000000023660                . = ALIGN ((. != 0x0)?0x4:0x1)
+                0x0000000000023660                . = ALIGN (0x4)
+                0x0000000000023660                . = ALIGN (0x4)
+                0x0000000000023660                _end = .
+                0x0000000000023660                PROVIDE (end, .)
+                0x0000000000023660                . = DATA_SEGMENT_END (.)
+
+.stab
+ *(.stab)
+
+.stabstr
+ *(.stabstr)
+
+.stab.excl
+ *(.stab.excl)
+
+.stab.exclstr
+ *(.stab.exclstr)
+
+.stab.index
+ *(.stab.index)
+
+.stab.indexstr
+ *(.stab.indexstr)
+
+.comment        0x0000000000000000      0x2aa
+ *(.comment)
+ .comment       0x0000000000000000       0x1f obj/main.o
+ .comment       0x000000000000001f       0x1f obj/syscall.o
+ .comment       0x000000000000003e       0x1f obj/test_proc.o
+ .comment       0x000000000000005d       0x1f obj/schedule.o
+ .comment       0x000000000000007c       0x1f obj/keyboard.o
+ .comment       0x000000000000009b       0x1f obj/task.o
+ .comment       0x00000000000000ba       0x1f obj/proc_paging.o
+ .comment       0x00000000000000d9       0x1f obj/tty.o
+ .comment       0x00000000000000f8       0x1f obj/hd.o
+ .comment       0x0000000000000117       0x1f obj/libfs.a(buffer.o)
+ .comment       0x0000000000000136       0x1f obj/libfs.a(inode.o)
+ .comment       0x0000000000000155       0x1f obj/libfs.a(namei.o)
+ .comment       0x0000000000000174       0x1f obj/libfs.a(truncate.o)
+ .comment       0x0000000000000193       0x1f obj/global.o
+ .comment       0x00000000000001b2       0x1f obj/time.o
+ .comment       0x00000000000001d1       0x1f obj/tool.o
+ .comment       0x00000000000001f0       0x1f obj/packet.o
+ .comment       0x000000000000020f       0x1f obj/rtl8139.o
+ .comment       0x000000000000022e       0x1f obj/libcommon.a(common_func.o)
+ .comment       0x000000000000024d       0x1f obj/libcommon.a(cycle_buf.o)
+ .comment       0x000000000000026c       0x1f obj/libcommon.a(hash.o)
+ .comment       0x000000000000028b       0x1f obj/redefine.o
+
+.debug
+ *(.debug)
+
+.line
+ *(.line)
+
+.debug_srcinfo
+ *(.debug_srcinfo)
+
+.debug_sfnames
+ *(.debug_sfnames)
+
+.debug_aranges
+ *(.debug_aranges)
+
+.debug_pubnames
+ *(.debug_pubnames)
+
+.debug_info
+ *(.debug_info .gnu.linkonce.wi.*)
+
+.debug_abbrev
+ *(.debug_abbrev)
+
+.debug_line
+ *(.debug_line)
+
+.debug_frame
+ *(.debug_frame)
+
+.debug_str
+ *(.debug_str)
+
+.debug_loc
+ *(.debug_loc)
+
+.debug_macinfo
+ *(.debug_macinfo)
+
+.debug_weaknames
+ *(.debug_weaknames)
+
+.debug_funcnames
+ *(.debug_funcnames)
+
+.debug_typenames
+ *(.debug_typenames)
+
+.debug_varnames
+ *(.debug_varnames)
+
+/DISCARD/
+ *(.note.GNU-stack)
+OUTPUT(./bin/kernel.bin binary)

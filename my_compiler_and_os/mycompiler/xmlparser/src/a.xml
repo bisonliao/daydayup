@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="GBK"?> 
+<Question prop1='a' prop2='b'>
+<a>
+	<b> 1 </b>
+	<b> 2 </b>
+</a>
+<a>
+	<b> 3 </b>
+	<b> 4 </b>
+</a>
+</Question>

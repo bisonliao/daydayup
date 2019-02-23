@@ -1,0 +1,29 @@
+#########################################
+#注意更改VC_DIR为vc6.0的安装目录
+#VC_DIR=C:\install\Microsoft Visual Studio\VC98
+VC_DIR=E:\Program Files\Microsoft Visual Studio\VC98
+LIB_PATH=$(VC_DIR)\Lib
+
+INCL=/I. /I..\include  /I..\Lily_Run /I"$(VC_DIR)\INCLUDE" /I"$(VC_DIR)\MFC\INCLUDE" /I"$(VC_DIR)\ATL\INCLUDE"
+
+CFLAGS=/D_WIN32_ /D_MAKE_DLL $(INCL)  /O2 /D_DEBUG
+
+LIBS="$(LIB_PATH)\uuid.lib" "$(LIB_PATH)\LIBC.lib" "$(LIB_PATH)\Ws2_32.lib" "$(LIB_PATH)\OLDNAMES.lib" "$(LIB_PATH)\kernel32.lib" "$(LIB_PATH)\LIBCI.lib" "$(LIB_PATH)\LIBCP.lib"
+
+CC=cl
+
+run_fun.dll:Run_Fun.obj ..\Lily_Run\Variable.obj ..\share\AnsiString.obj ..\share\MemBlock.obj ..\share\tool.obj
+	$(CC) /LD /o$@ Run_Fun.obj ..\Lily_Run\Variable.obj ..\share\AnsiString.obj ..\share\MemBlock.obj ..\share\tool.obj $(LIBS) $(CFLAGS)
+	-copy run_fun.dll ..\bin
+	-copy run_fun.dll ..\Lily_Run
+	-copy run_fun.lib ..\bin
+	-copy run_fun.lib ..\Lily_Run
+#---------------------------------------------------------------
+
+Run_Fun.obj:Run_Fun.cpp
+	$(CC) /c /Fo$@ Run_Fun.cpp $(CFLAGS)
+
+
+clean:
+	-del .\*.obj
+

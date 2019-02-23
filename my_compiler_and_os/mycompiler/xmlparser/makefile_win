@@ -1,0 +1,49 @@
+#########################################
+#注意更改VC_DIR为vc6.0的安装目录
+#VC_DIR=C:\install\Microsoft Visual Studio\VC98
+VC_DIR=E:\Program Files\Microsoft Visual Studio\VC98
+LIB_PATH=$(VC_DIR)\Lib
+
+INCL=/I. /I.\inc /I"$(VC_DIR)\INCLUDE" /I"$(VC_DIR)\MFC\INCLUDE" /I"$(VC_DIR)\ATL\INCLUDE"
+
+CFLAGS=/D_WINDOWS_OS_ $(INCL) /D_MAKE_DLL_ /O2 /D_WIN32_
+
+LIBS="$(LIB_PATH)\uuid.lib" "$(LIB_PATH)\LIBC.lib" "$(LIB_PATH)\Ws2_32.lib" "$(LIB_PATH)\OLDNAMES.lib" "$(LIB_PATH)\kernel32.lib"
+
+CC=cl /TP  /GX
+
+
+SRC_DIR		=.\src
+INC_DIR		=.\inc
+OBJ_DIR		=.\obj
+LIB_DIR		=.\lib
+BIN_DIR		=.\bin
+
+objs=$(OBJ_DIR)\xmlnode.obj $(OBJ_DIR)\xmlread.yy.obj $(OBJ_DIR)\AnsiString.obj $(OBJ_DIR)\xml.obj \
+	$(OBJ_DIR)\xmlread2.zz.obj $(OBJ_DIR)\xml2.obj $(OBJ_DIR)\main.obj
+
+dll_file:xmlparser.exe
+
+
+xmlparser.exe:$(objs)
+	$(CC)  /o$@ $(objs) $(LIBS) $(CFLAGS)
+	#$(CC) /LD /o$@ $(objs) $(LIBS) $(CFLAGS)
+
+$(OBJ_DIR)\main.obj:$(SRC_DIR)\main.cpp
+	$(CC) /c /Fo$@ $(SRC_DIR)\main.cpp $(CFLAGS)
+$(OBJ_DIR)\xml.obj:$(SRC_DIR)\xml.cpp
+	$(CC) /c /Fo$@ $(SRC_DIR)\xml.cpp $(CFLAGS)
+$(OBJ_DIR)\xml2.obj:$(SRC_DIR)\xml2.cpp
+	$(CC) /c /Fo$@ $(SRC_DIR)\xml2.cpp $(CFLAGS)
+$(OBJ_DIR)\xmlnode.obj:$(SRC_DIR)\xmlnode.cpp
+	$(CC) /c /Fo$@ $(SRC_DIR)\xmlnode.cpp $(CFLAGS)
+$(OBJ_DIR)\AnsiString.obj:$(SRC_DIR)\AnsiString.cpp
+	$(CC) /c /Fo$@ $(SRC_DIR)\AnsiString.cpp $(CFLAGS)
+$(OBJ_DIR)\xmlread.yy.obj:$(SRC_DIR)\xmlread.yy.cpp
+	$(CC) /c /Fo$@ $(SRC_DIR)\xmlread.yy.cpp $(CFLAGS)
+$(OBJ_DIR)\xmlread2.zz.obj:$(SRC_DIR)\xmlread2.zz.cpp
+	$(CC) /c /Fo$@ $(SRC_DIR)\xmlread2.zz.cpp $(CFLAGS)
+
+
+clean:
+	-del .\obj\*.obj

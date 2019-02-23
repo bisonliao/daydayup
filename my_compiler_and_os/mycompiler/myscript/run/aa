@@ -1,0 +1,11 @@
+!!!BEGIN main
+PUSH #"hello world!\n"
+SAV v1
+PUSH v1
+PUSH ^1
+CALL print
+SAV v2
+PUSH v2
+CLEAR
+LABEL l0
+!!!END

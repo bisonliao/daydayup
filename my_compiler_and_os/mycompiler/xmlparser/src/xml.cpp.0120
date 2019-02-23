@@ -1,0 +1,769 @@
+#if !defined(_WIN32_)
+#include <unistd.h>
+#endif
+#include <stdlib.h>
+//#include <iostream>
+#include <stdio.h>
+#include <fstream.h>
+#include <string.h>
+#include "FlexLexer.h"
+
+#include "xml.h"
+#include "xmllex.h"
+
+#if defined(_WIN32_)
+	#include <io.h>
+
+	#define snprintf _snprintf
+	#define open	_open
+	#define dup2	_dup2
+#endif
+
+#include <stack>
+
+
+Xml::Xml()
+{
+	m_RootPtr = NULL;
+}
+Xml::~Xml()
+{
+	Clear();
+}
+
+typedef struct 
+{
+	XmlNode * NodePtr;
+	list<XmlNode*>::const_iterator It;
+} DEPTH_SCAN_STACK_ELE_TYPE;
+/*
+*	对整棵树进行深度优先的非递归遍历，得到所有节点的序列
+*	保存在lst中，成功返回0，失败返回-1
+*/
+int Xml::DepthScan(list<XmlNode*> & lst) const
+{
+	lst.clear();
+
+	if (m_RootPtr == NULL)
+	{
+		return 0;
+	}
+
+	stack<DEPTH_SCAN_STACK_ELE_TYPE> stk;
+	DEPTH_SCAN_STACK_ELE_TYPE stk_ele, stk_ele2;
+	list<XmlNode*>::const_iterator it;
+	XmlNode * curptr = NULL;
+
+	stk_ele.NodePtr = m_RootPtr;
+	stk_ele.It = m_RootPtr->GetNodeChildList().begin();
+	stk.push(stk_ele);
+
+
+	while (!stk.empty())
+	{
+		stk_ele2 = stk.top();
+		if (stk_ele2.NodePtr->GetNodeChildList().empty())	/*叶子节点*/
+		{
+			lst.push_back(stk_ele2.NodePtr);
+			stk.pop();
+		}
+		else	/*不是叶子*/
+		{
+			it = stk_ele2.It;
+			if (it == stk_ele2.NodePtr->GetNodeChildList().end()) /*所有孩子都遍历了*/
+			{
+				lst.push_back(stk_ele2.NodePtr);
+				stk.pop();
+			}
+			else /*遍历下一个孩子*/
+			{
+				//取得子节点指针、初始化子节点的迭代器
+				stk_ele.NodePtr = *it;
+				stk_ele.It = stk_ele.NodePtr->GetNodeChildList().begin();
+				//修改栈顶节点的It的值
+				stk.pop();
+				++(stk_ele2.It);
+				stk.push(stk_ele2);
+				//把这个小孩压栈
+				stk.push(stk_ele);
+			}
+		}
+	}
+	return 0;
+}
+int Xml::WriteToBuffer(char * buffer, unsigned short buffersize)
+{
+	if (buffersize == 0)
+	{
+		return -1;
+	}
+	if (m_RootPtr == NULL)
+	{
+		strcpy(buffer, "");
+		return 0;
+	}
+
+	stack<DEPTH_SCAN_STACK_ELE_TYPE> stk;
+	DEPTH_SCAN_STACK_ELE_TYPE stk_ele, stk_ele2;
+	list<XmlNode*>::const_iterator it;
+	XmlNode * curptr = NULL;
+
+	stk_ele.NodePtr = m_RootPtr;
+	stk_ele.It = m_RootPtr->GetNodeChildList().begin();
+	stk.push(stk_ele);
+
+	/*写根节点的开始符号和属性*/
+	AnsiString xmlstring =  "<?xml version=\"1.0\" encoding=\"GBK\"?>\n";
+	xmlstring.concat("<");
+	xmlstring.concat(stk_ele.NodePtr->GetNodeName());
+	if (stk_ele.NodePtr->GetNodeProperty().length() == 0)
+	{
+		xmlstring.concat(">");
+	}
+	else
+	{
+		xmlstring.concat(" ");
+		xmlstring.concat(stk_ele.NodePtr->GetNodeProperty());
+		xmlstring.concat(">");
+	}
+
+	while (!stk.empty())
+	{
+		stk_ele2 = stk.top();
+		if (stk_ele2.NodePtr->GetNodeChildList().empty())	/*叶子节点*/
+		{
+			/*写叶子节点的值*/
+			xmlstring.concat(stk_ele2.NodePtr->GetNodeValue());
+			/*写叶子节点的结束符号*/
+			xmlstring.concat("</");
+			xmlstring.concat(stk_ele2.NodePtr->GetNodeName());
+			xmlstring.concat(">\n");
+
+			stk.pop();
+		}
+		else	/*不是叶子*/
+		{
+			it = stk_ele2.It;
+			if (it == stk_ele2.NodePtr->GetNodeChildList().end()) /*所有孩子都遍历了*/
+			{
+				xmlstring.concat("</");
+				xmlstring.concat(stk_ele2.NodePtr->GetNodeName());
+				xmlstring.concat(">");
+				stk.pop();
+			}
+			else /*遍历下一个孩子*/
+			{
+				//取得子节点指针、初始化子节点的迭代器
+				stk_ele.NodePtr = *it;
+				stk_ele.It = stk_ele.NodePtr->GetNodeChildList().begin();
+				//修改栈顶节点的It的值
+				stk.pop();
+				++(stk_ele2.It);
+				stk.push(stk_ele2);
+				//把这个小孩压栈
+				xmlstring.concat("<");
+				xmlstring.concat(stk_ele.NodePtr->GetNodeName());
+				if (stk_ele.NodePtr->GetNodeProperty().length() == 0)
+				{
+					xmlstring.concat(">");
+				}
+				else
+				{
+					xmlstring.concat(" ");
+					xmlstring.concat(stk_ele.NodePtr->GetNodeProperty());
+					xmlstring.concat(">");
+				}
+				stk.push(stk_ele);
+			}
+		}
+	}
+	strncpy(buffer, xmlstring.c_str(), buffersize);
+	return 0;
+}
+
+int Xml::WriteToFile(const char * xmlfilename, char* errmsg, unsigned short errmsgsize)
+{
+	FILE * out;
+	if ( (out = fopen(xmlfilename, "wb+")) == NULL)
+	{
+	
+		snprintf(errmsg, errmsgsize, "打开文件[%s]失败!", xmlfilename);
+	
+		return -1;
+	}
+	if (m_RootPtr == NULL)
+	{
+		fclose(out);
+		return 0;
+	}
+
+	stack<DEPTH_SCAN_STACK_ELE_TYPE> stk;
+	DEPTH_SCAN_STACK_ELE_TYPE stk_ele, stk_ele2;
+	list<XmlNode*>::const_iterator it;
+	XmlNode * curptr = NULL;
+
+	stk_ele.NodePtr = m_RootPtr;
+	stk_ele.It = m_RootPtr->GetNodeChildList().begin();
+	stk.push(stk_ele);
+
+	/*写根节点的开始符号和属性*/
+	fprintf(out, "<?xml version=\"1.0\" encoding=\"GBK\"?>\n");
+	fprintf(out, "<%s", stk_ele.NodePtr->GetNodeName().c_str());
+	if (stk_ele.NodePtr->GetNodeProperty().length() == 0)
+	{
+		fprintf(out, ">");
+	}
+	else
+	{
+		fprintf(out, " %s>", stk_ele.NodePtr->GetNodeProperty().c_str());
+	}
+
+	while (!stk.empty())
+	{
+		stk_ele2 = stk.top();
+
+		if (stk_ele2.NodePtr->GetNodeChildList().empty())	/*叶子节点*/
+		{
+			/*写叶子节点的值*/
+			fprintf(out, "%s", stk_ele2.NodePtr->GetNodeValue().c_str());
+			/*写叶子节点的结束符号*/
+			fprintf(out, "</%s>\n", stk_ele2.NodePtr->GetNodeName().c_str());
+
+			stk.pop();
+		}
+		else	/*不是叶子*/
+		{
+			it = stk_ele2.It;
+			if (it == stk_ele2.NodePtr->GetNodeChildList().end()) /*所有孩子都遍历了*/
+			{
+				fprintf(out, "</%s>", stk_ele2.NodePtr->GetNodeName().c_str());
+				stk.pop();
+			}
+			else /*遍历下一个孩子*/
+			{
+				//取得子节点指针、初始化子节点的迭代器
+				stk_ele.NodePtr = *it;
+				stk_ele.It = stk_ele.NodePtr->GetNodeChildList().begin();
+				//修改栈顶节点的It的值
+				stk.pop();
+				++(stk_ele2.It);
+				stk.push(stk_ele2);
+				//把这个小孩压栈
+				fprintf(out, "<%s", stk_ele.NodePtr->GetNodeName().c_str());
+				if (stk_ele.NodePtr->GetNodeProperty().length() == 0)
+				{
+					fprintf(out, ">");
+				}
+				else
+				{
+					fprintf(out, " %s>", stk_ele.NodePtr->GetNodeProperty().c_str());
+				}
+				stk.push(stk_ele);
+			}
+		}
+	}
+	fclose(out);
+	return 0;
+}
+int Xml::ReadFrmFile(const char * xmlfilename, char *errmsg, unsigned short errmsgsize)
+{
+	this->Clear();
+	m_RootPtr = NULL;
+	XmlNode* CurPtr = NULL;
+	XmlNode* newptr = NULL;
+	int nCode = -1;
+
+
+	ifstream in(xmlfilename, ios::in|ios::binary);
+	yyFlexLexer lexer(&in);
+
+	int retcode;
+	int nLevel = 0; /*层次，根节点为第1层*/
+
+	stack<XmlNode*> stk;
+	stk.push(NULL);
+
+
+    while ( (retcode = lexer.yylex()) != 0)
+	{
+		/*取得单词属性*/
+		const YYVAL_TYPE *yylval = __GetYYVal();
+
+
+		switch(retcode)
+		{
+			case XML_LEX_HEADER:
+					if (nLevel != 0)
+					{
+		
+						snprintf(errmsg, errmsgsize, "[%d]文件%s有错误!unexpected <?XML...?>",
+									__LINE__,
+									xmlfilename);
+				
+						nCode=-1;
+						goto ReadFrmFile_EXIT;
+					}
+					break;
+			case XML_LEX_BEGIN:
+					++nLevel;
+					/*新建一节点*/
+					newptr = new XmlNode();
+					if (newptr == NULL)
+					{
+						snprintf(errmsg, errmsgsize, "内存分配失败!");
+						nCode=-1;
+						goto ReadFrmFile_EXIT;
+					}
+					if (nLevel == 1)
+					{
+						m_RootPtr = newptr;
+					}
+					newptr->SetNodeName(yylval->name);	
+					newptr->SetNodeProperty(yylval->property);
+					newptr->SetNodeValue("");	
+					newptr->SetParent(CurPtr);
+
+					if (CurPtr != NULL)
+					{
+						CurPtr->SetNodeValue("");	/*对于有子节点的节点，其值为空*/
+						CurPtr->AddChild(newptr);
+					}
+					stk.push(newptr);
+					/*更新当前节点指针*/
+					CurPtr = newptr;
+
+					break;
+			case XML_LEX_EMPNODE:
+					++nLevel;
+					/*新建一节点*/
+					newptr = new XmlNode();
+					if (newptr == NULL)
+					{
+						snprintf(errmsg, errmsgsize, "内存分配失败!");
+						nCode=-1;
+						goto ReadFrmFile_EXIT;
+					}
+					if (nLevel == 1)
+					{
+						m_RootPtr = newptr;
+					}
+					newptr->SetNodeName(yylval->name);	
+					newptr->SetNodeProperty(yylval->property);
+					newptr->SetNodeValue("");	
+					newptr->SetParent(CurPtr);
+
+					if (CurPtr != NULL)
+					{
+						CurPtr->SetNodeValue("");	/*对于有子节点的节点，其值为空*/
+						CurPtr->AddChild(newptr);
+					}
+
+					nLevel--;
+					if (nLevel == 0)
+					{
+						return 0;
+					}
+					break;
+			case XML_LEX_END:
+					if ( !(CurPtr->GetNodeName()==AnsiString(yylval->name)) )
+					{
+						snprintf(errmsg, errmsgsize, 
+						"[%d]文件%s有错误!字段名字前后不匹配[%s][%s]",
+								__LINE__,
+								xmlfilename,
+								CurPtr->GetNodeName().c_str(),
+								yylval->name);
+						nCode=-1;
+						goto ReadFrmFile_EXIT;
+					}
+
+					--nLevel;
+					if (nLevel < 0 || stk.size() == 0)
+					{
+						snprintf(errmsg, errmsgsize, "[%d]文件%s有错误!节点开闭符号不匹配",
+								__LINE__,
+								xmlfilename);
+						nCode=-1;
+						goto ReadFrmFile_EXIT;
+					}
+					/*更新当前节点指针*/
+					stk.pop();
+					CurPtr = stk.top();
+					if (nLevel == 0)
+					{
+						return 0;
+					}
+
+					break;
+			case XML_LEX_VALUE:
+					if (CurPtr != NULL)
+					{
+						CurPtr->SetNodeValue(yylval->value);
+					}
+					else
+					{
+						snprintf(errmsg, errmsgsize, "[%d]文件%s有错误! nlevel=[%d]",
+									__LINE__,
+									xmlfilename, nLevel);
+						nCode=-1;
+						goto ReadFrmFile_EXIT;
+					}
+					break;
+			default:
+					snprintf(errmsg, errmsgsize, "[%d]文件%s有错误!unexpected character[%d][%c]",
+								__LINE__,
+								xmlfilename,
+								retcode,
+								retcode);
+					nCode=-1;
+					goto ReadFrmFile_EXIT;
+					break;
+		}
+	}
+	if (nLevel != 0)
+	{
+		snprintf(errmsg, errmsgsize, "文件%s中Xml节点的开始符号和结束符号不匹配!",
+					xmlfilename);
+		nCode=-1;
+		goto ReadFrmFile_EXIT;
+	}
+	nCode = 0;
+ReadFrmFile_EXIT:
+	#if defined(_AIX_) || defined(_WIN32_)
+		dup2(oldstdin, 0);
+	#endif
+	return nCode;
+	
+}
+void Xml::Clear()
+{
+	list<XmlNode*> lst;
+	this->DepthScan(lst);
+	list<XmlNode*>::iterator it;
+	#ifdef _DEBUG
+			//printf("运行[%s][%d]\n", __FILE__, __LINE__);
+			//printf("lst.size()=[%d]\n", lst.size());
+	#endif
+	for (it = lst.begin(); it != lst.end(); ++it)
+	{
+		XmlNode * ptr = *it;
+		#ifdef _DEBUG
+		//printf("删除节点%s\n", ptr->GetNodeName().c_str());
+		#endif
+		delete ptr;
+	}
+	m_RootPtr = NULL;
+}
+/*
+*分析路径
+*	例如path="/abc/efg:1", 执行后lst1中有两个AnsiString元素 "abc"和"efg"
+*	lst2中有两个int类型元素0和1
+*/
+int Xml::SplitPath(const AnsiString & path, list<AnsiString> & lst1, list<int> &lst2)
+{
+	lst1.clear();
+	lst2.clear();
+	if (path[0] != '/')
+	{
+		return -1;
+	}
+
+	AnsiString ppp = path;
+	ppp.concat("/");
+
+	int start = 1;
+	int len = ppp.length();
+	for (int i = 1; i < len; ++i)
+	{
+		if (ppp[i] == '/')
+		{
+			AnsiString sub = ppp.substring(start, i-start);
+			start = i+1;
+
+			sub.trim();
+			if (sub.length() == 0) /*相邻的两个'/'被当作一个*/
+			{
+				continue;
+			}
+
+			/*
+			* 例如 abc:1 分成abc和1
+			*      abc   分成abc和0
+			*/
+			int sep_index = sub.GetIndexOf(':');
+			if (sep_index == 0)
+			{
+				return -1;
+			}
+			if (sep_index != -1)
+			{
+				lst1.push_back(sub.substring(0, sep_index));
+				lst2.push_back(atoi(sub.substring(sep_index+1).c_str()));
+			}
+			else
+			{
+				lst1.push_back(sub);
+				lst2.push_back(0);
+			}
+		}
+	}
+	return 0;
+}
+int Xml::GetNodeInfo(const char * path, char* NodeValue, unsigned int NodeValueSize,
+									   char* NodeProperty, unsigned int NodePropertySize)
+{
+	if (NULL == NodeValue || NULL == NodeProperty)
+	{
+		return -1;
+	}
+	if (NULL == m_RootPtr)
+	{
+		return -1;
+	}
+	list<AnsiString> list1;
+	list<int> list2;
+	if (SplitPath(path, list1, list2) != 0)
+	{
+		return -1;
+	}
+
+	XmlNode * curptr = m_RootPtr;
+
+	list<AnsiString>::const_iterator it1 = list1.begin();
+	list<int>::const_iterator it2 = list2.begin();
+	AnsiString nodename = *it1;
+	int nodeindex = *it2;
+
+	if (m_RootPtr->GetNodeName() == nodename && nodeindex == 0)
+	{
+		/*根节点能够匹配*/
+	}
+	else
+	{
+		return -1;
+	}
+
+	for (++it1, ++it2; it1 != list1.end(); ++it1, ++it2)
+	{
+		nodename = *it1;
+		nodeindex = *it2;
+
+		curptr = curptr->GetChildByNodeName(nodename.c_str(), nodeindex);
+		if (curptr == NULL)
+		{
+			return -1;
+		}
+	}
+	memset(NodeValue, 0, NodeValueSize);
+	memset(NodeProperty, 0, NodePropertySize);
+	strncpy(NodeValue, curptr->GetNodeValue().c_str(), NodeValueSize);
+	strncpy(NodeProperty, curptr->GetNodeProperty().c_str(), NodePropertySize);
+	return 0;
+}
+int Xml::InitRoot(const char* RootName, const char* RootValue, const char* RootProperty)
+{
+	if (RootName == NULL || RootValue == NULL || RootProperty == NULL)
+	{
+		return -1;
+	}
+	Clear();
+	m_RootPtr = new XmlNode();
+	if ( NULL == m_RootPtr)
+	{
+		return -1;
+	}
+	m_RootPtr->SetNodeName(RootName);
+	m_RootPtr->SetNodeValue(RootValue);
+	m_RootPtr->SetNodeProperty(RootProperty);
+	return 0;
+}
+int Xml::SetNodeInfo(const char * path, const char* NodeValue, const char* NodeProperty)
+{
+	if (NULL == NodeValue || NULL == NodeProperty)
+	{
+		return -1;
+	}
+	if (NULL == m_RootPtr) /*根必须已经初始化*/
+	{
+		return -1;
+	}
+	list<AnsiString> list1;
+	list<int> list2;
+	if (SplitPath(path, list1, list2) != 0)
+	{
+		return -1;
+	}
+
+
+	list<AnsiString>::const_iterator it1 = list1.begin();
+	list<int>::const_iterator it2 = list2.begin();
+	AnsiString nodename = *it1;
+	int nodeindex = *it2;
+
+	if (m_RootPtr->GetNodeName() == nodename && nodeindex == 0)
+	{
+		/*根节点能够匹配*/
+	}
+	else
+	{
+		return -1;
+	}
+
+	XmlNode * curptr = m_RootPtr;
+	/*一层层的把路径建立起来*/
+	for (++it1, ++it2; it1 != list1.end(); ++it1, ++it2)
+	{
+		nodename = *it1;
+		nodeindex = *it2;
+
+		if (curptr->AssureChildExist(nodename.c_str(), nodeindex) < 0)
+		{
+			return -1;
+		}
+		curptr = curptr->GetChildByNodeName(nodename.c_str(), nodeindex);
+		if (curptr == NULL)
+		{
+			return -1;
+		}
+	}
+	curptr->SetNodeValue(NodeValue);
+	curptr->SetNodeProperty(NodeProperty);
+	return 0;
+}
+const char * Xml::GetRootName() const
+{
+	if (m_RootPtr == NULL)
+	{
+		return NULL;
+	}
+	return m_RootPtr->GetNodeName().c_str();
+}
+int Xml::ExportNode(const char* path, char* buffer, int buffersize, bool bNodeSelf )
+{
+	if (buffer == NULL)
+	{
+		return -1;
+	}
+	memset(buffer, 0, buffersize);
+
+	if (NULL == m_RootPtr)
+	{
+		return -1;
+	}
+	list<AnsiString> list1;
+	list<int> list2;
+	if (SplitPath(path, list1, list2) != 0)
+	{
+		return -1;
+	}
+
+	XmlNode * curptr = m_RootPtr;
+
+	list<AnsiString>::const_iterator it1 = list1.begin();
+	list<int>::const_iterator it2 = list2.begin();
+	AnsiString nodename = *it1;
+	int nodeindex = *it2;
+
+	if (m_RootPtr->GetNodeName() == nodename && nodeindex == 0)
+	{
+		/*根节点能够匹配*/
+	}
+	else
+	{
+		return -1;
+	}
+
+	for (++it1, ++it2; it1 != list1.end(); ++it1, ++it2)
+	{
+		nodename = *it1;
+		nodeindex = *it2;
+
+		curptr = curptr->GetChildByNodeName(nodename.c_str(), nodeindex);
+		if (curptr == NULL)
+		{
+			return -1;
+		}
+	}
+	//到这里, curptr指向了path指定的节点
+	XmlNode * startnode = curptr;
+
+	stack<DEPTH_SCAN_STACK_ELE_TYPE> stk;
+	DEPTH_SCAN_STACK_ELE_TYPE stk_ele, stk_ele2;
+	list<XmlNode*>::const_iterator it;
+	curptr = NULL;
+
+	stk_ele.NodePtr = startnode;
+	stk_ele.It = startnode->GetNodeChildList().begin();
+	stk.push(stk_ele);
+
+	AnsiString xmlstring =  "";
+	if (bNodeSelf)
+	{
+		xmlstring.concat("<");
+		xmlstring.concat(stk_ele.NodePtr->GetNodeName());
+		if (stk_ele.NodePtr->GetNodeProperty().length() == 0)
+		{
+			xmlstring.concat(">");
+		}
+		else
+		{
+			xmlstring.concat(" ");
+			xmlstring.concat(stk_ele.NodePtr->GetNodeProperty());
+			xmlstring.concat(">");
+		}
+	}
+
+	while (!stk.empty())
+	{
+		stk_ele2 = stk.top();
+		if (stk_ele2.NodePtr->GetNodeChildList().empty())	/*叶子节点*/
+		{
+			/*写叶子节点的值*/
+			xmlstring.concat(stk_ele2.NodePtr->GetNodeValue());
+			/*写叶子节点的结束符号*/
+			xmlstring.concat("</");
+			xmlstring.concat(stk_ele2.NodePtr->GetNodeName());
+			xmlstring.concat(">\n");
+
+			stk.pop();
+		}
+		else	/*不是叶子*/
+		{
+			it = stk_ele2.It;
+			if (it == stk_ele2.NodePtr->GetNodeChildList().end()) /*所有孩子都遍历了*/
+			{
+				xmlstring.concat("</");
+				xmlstring.concat(stk_ele2.NodePtr->GetNodeName());
+				xmlstring.concat(">");
+				stk.pop();
+			}
+			else /*遍历下一个孩子*/
+			{
+				//取得子节点指针、初始化子节点的迭代器
+				stk_ele.NodePtr = *it;
+				stk_ele.It = stk_ele.NodePtr->GetNodeChildList().begin();
+				//修改栈顶节点的It的值
+				stk.pop();
+				++(stk_ele2.It);
+				stk.push(stk_ele2);
+				//把这个小孩压栈
+				xmlstring.concat("<");
+				xmlstring.concat(stk_ele.NodePtr->GetNodeName());
+				if (stk_ele.NodePtr->GetNodeProperty().length() == 0)
+				{
+					xmlstring.concat(">");
+				}
+				else
+				{
+					xmlstring.concat(" ");
+					xmlstring.concat(stk_ele.NodePtr->GetNodeProperty());
+					xmlstring.concat(">");
+				}
+				stk.push(stk_ele);
+			}
+		}
+	}
+	strncpy(buffer, xmlstring.c_str(), buffersize);
+
+	return 0;
+}

@@ -1,0 +1,50 @@
+#########################################
+#注意更改VC_DIR为vc6.0的安装目录
+#VC_DIR=C:\install\Microsoft Visual Studio\VC98
+VC_DIR=E:\Program Files\Microsoft Visual Studio\VC98
+LIB_PATH=$(VC_DIR)\Lib
+
+INCL=/I. /I..\include /I. /I"$(VC_DIR)\INCLUDE" /I"$(VC_DIR)\MFC\INCLUDE" /I"$(VC_DIR)\ATL\INCLUDE"
+
+CFLAGS=/D_WIN32_ $(INCL)  /O2 /D_DEBUG
+#CFLAGS=/D_WIN32_ $(INCL)  /O2 /D_MAKE_DLL
+
+LIBS=.\Run_Fun.lib "$(LIB_PATH)\uuid.lib" "$(LIB_PATH)\LIBC.lib" "$(LIB_PATH)\Ws2_32.lib" "$(LIB_PATH)\OLDNAMES.lib" "$(LIB_PATH)\kernel32.lib" "$(LIB_PATH)\LIBCI.lib" "$(LIB_PATH)\LIBCP.lib"
+
+CC=cl
+
+EXE_FILE:clean lily_run.exe
+
+DLL_FILE:clean lily_run.dll
+
+lily_run.exe:LabelIndex_List.obj Variable.obj instruct_list.obj Variable_Stack.obj int_Stack.obj run_main.obj ..\share\AnsiString.obj ..\share\tool.obj ..\share\MemBlock.obj
+	$(CC)  /o$@ LabelIndex_List.obj Variable.obj instruct_list.obj Variable_Stack.obj int_Stack.obj run_main.obj  $(LIBS) ..\share\AnsiString.obj ..\share\tool.obj ..\share\MemBlock.obj
+	-copy lily_run.exe ..\bin
+	
+#---------------------------------------------------------------
+lily_run.dll:LabelIndex_List.obj Variable.obj instruct_list.obj Variable_Stack.obj int_Stack.obj run_main.obj ..\share\AnsiString.obj ..\share\tool.obj ..\share\MemBlock.obj
+	$(CC) /LD /o$@ LabelIndex_List.obj Variable.obj instruct_list.obj Variable_Stack.obj int_Stack.obj run_main.obj  $(LIBS) ..\share\AnsiString.obj ..\share\tool.obj ..\share\MemBlock.obj
+	-copy lily_run.dll ..\lib
+	-copy lily_run.lib ..\lib
+	-copy lily_run.h ..\lib
+
+LabelIndex_List.obj:LabelIndex_List.cpp
+	$(CC) /c /Fo$@ LabelIndex_List.cpp $(CFLAGS)
+Variable.obj:Variable.cpp
+	$(CC) /c /Fo$@ Variable.cpp $(CFLAGS)
+instruct_list.obj:instruct_list.cpp
+	$(CC) /c /Fo$@ instruct_list.cpp $(CFLAGS)
+Variable_Stack.obj:Variable_Stack.cpp
+	$(CC) /c /Fo$@ Variable_Stack.cpp $(CFLAGS)
+int_Stack.obj:int_Stack.cpp
+	$(CC) /c /Fo$@ int_Stack.cpp $(CFLAGS)
+run_main.obj:run_main.cpp
+	$(CC) /c /Fo$@ run_main.cpp $(CFLAGS)
+
+#---------------------------------------------------------------
+
+
+clean:
+	-del .\*.obj
+
+

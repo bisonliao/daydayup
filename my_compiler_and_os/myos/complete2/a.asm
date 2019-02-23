@@ -1,0 +1,6 @@
+[SECTION .s32]
+ALIGN   32
+[BITS 32]
+LABEL_SEG_CODE32:
+	jmp far [eax]
+

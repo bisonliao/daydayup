@@ -1,0 +1,24 @@
+#line 1 a.txt
+[mult]
+begin
+	float f1,f2,f3;
+	f1 = atof(g_0);
+	f2 = atof(g_1);
+	f3 = f1 * f2;
+	g_3 = str(f3);
+end
+
+[main]
+begin
+	int i;
+	float f;
+
+	for (i = 0; i < 1000; i=i+1)
+	do
+		f = 3241321.5*341.36546;
+		if (i == 100) then
+			print(f);
+		endif
+		
+	endfor
+end

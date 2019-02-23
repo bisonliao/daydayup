@@ -1,0 +1,23 @@
+#!/bin/sh
+if [ $# -lt 1 ] 
+then
+	echo "Usage:lily_cpl <待编译的文件名> [编译后的文件名]"
+	exit -1;
+fi
+
+tmpfile=tmpfile.$$
+
+echo "prep -f $1 -o $tmpfile -I $INCL"
+prep -f $1 -o $tmpfile -I $INCL
+if [ $? -eq 0 ]
+then
+	if [ $# -gt 1 ]
+	then
+		echo "compile -f $tmpfile -o $2"
+		compile -f $tmpfile -o $2
+	else
+		echo "compile -f $tmpfile -o $1.lily"
+		compile -f $tmpfile -o $1.lily
+	fi
+fi
+rm $tmpfile >/dev/null 2>&1

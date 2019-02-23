@@ -1,0 +1,4 @@
+[C_SCRIPT]
+begin
+	print("Ö´ÐÐC_SCRIPT");
+end

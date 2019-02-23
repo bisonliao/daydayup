@@ -1,0 +1,6 @@
+[main]
+begin
+	string s;
+	s = "echo 123456789";
+	system(s);
+end

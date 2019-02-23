@@ -1,0 +1,6 @@
+#include "c.txt"
+[B_SCRIPT]
+begin
+	print("Ö´ÐÐB_SCRIPT");
+	run("C_SCRIPT");
+end

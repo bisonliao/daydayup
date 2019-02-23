@@ -1,0 +1,56 @@
+#ifndef _C_HASH_H_INCLUDED_
+#define _C_HASH_H_INCLUDED_
+
+typedef struct
+{
+	volatile unsigned char head[100];
+} THashHead;
+
+int hash_init( THashHead * pstHead,
+		size_t iBucketNum, size_t iMaxKeySize, size_t iMaxValSize,
+		unsigned int (*fHash)(const unsigned char * keybuf, size_t keysize) ,
+		int (*fKeyEqual)(const unsigned char * key1, size_t key1size, const unsigned char * key2, size_t key2size),
+		void (*fNodeSwapOut)(const unsigned char * key, size_t keysize, const unsigned char * val, size_t valsize) );
+
+int hash_mem_attach(THashHead * pstHead, void * ptr, size_t size, int bCreat);
+
+int hash_insert(THashHead * pstHead, 
+		const unsigned char * keybuf, size_t keysize,
+		const unsigned char * valbuf, size_t valsize);
+
+int hash_update(THashHead * pstHead,
+		const unsigned char * keybuf, size_t keysize,
+		const unsigned char * valbuf, size_t valsize);
+
+///删除指定key的key-val对
+int hash_remove(THashHead * pstHead,
+		const unsigned char * keybuf, size_t keysize);
+
+/**
+ * 查找指定key，如果找到返回0，并将对应的val保存到(valbuf,pvalsize)
+ * 如果valbuf长度不够，将截断，返回2
+ * 如果没有找到，返回1
+ * 失败返回负数
+ */
+int hash_find(THashHead * pstHead,
+		const unsigned char * keybuf, size_t keysize,
+		unsigned char * valbuf, size_t * pvalsize);
+int hash_find2(THashHead * pstHead,
+		const unsigned char * keybuf, size_t keysize,
+		void * * ppVal);
+/**
+ * 判断指定key的key-val对是否存在
+ * 存在返回0
+ * 不存在返回1
+ * 失败返回负数
+ */ 
+int hash_exist(THashHead * pstHead,
+		const unsigned char * keybuf, size_t keysize);
+
+void hash_ScanUsedNode( THashHead * pstHead, 
+			void (*fScan)(const unsigned char * key, 
+			size_t keysize, 
+			const unsigned char * val, 
+			size_t valsize) );
+
+#endif

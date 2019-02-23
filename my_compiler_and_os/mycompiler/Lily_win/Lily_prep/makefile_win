@@ -1,0 +1,25 @@
+#########################################
+#注意更改VC_DIR为vc6.0的安装目录
+#VC_DIR=C:\install\Microsoft Visual Studio\VC98
+VC_DIR=E:\Program Files\Microsoft Visual Studio\VC98
+LIB_PATH=$(VC_DIR)\Lib
+
+INCL=/I..\include /I"$(VC_DIR)\INCLUDE" /I"$(VC_DIR)\MFC\INCLUDE" /I"$(VC_DIR)\ATL\INCLUDE"
+
+CFLAGS=/D_WIN32_ $(INCL) /O2
+
+LIBS="$(LIB_PATH)\uuid.lib" "$(LIB_PATH)\LIBC.lib" "$(LIB_PATH)\Ws2_32.lib" "$(LIB_PATH)\OLDNAMES.lib" "$(LIB_PATH)\kernel32.lib"
+
+OBJ=..\share\tool.obj prep.obj
+CC=cl
+
+all:..\bin\prep.exe
+
+
+..\bin\prep.exe:$(OBJ)
+	$(CC)  /o$@ $(OBJ) $(LIBS)
+prep.obj:prep.lex.c
+	$(CC) /c /Fo$@ prep.lex.c $(CFLAGS)
+
+clean:
+	-@del .\*.obj

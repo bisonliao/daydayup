@@ -1,0 +1,13 @@
+[main]
+begin
+	--这是一行注释
+	string s;
+	s = "Hello Lily";
+	system(s);
+	string addr;
+	addr = &s;
+	print(addr);
+	gets(addr);
+	print("您的输入是");
+	print(s);
+end

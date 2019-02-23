@@ -1,0 +1,38 @@
+#########################################
+#注意更改VC_DIR为vc6.0的安装目录
+VC_DIR=C:\install\Microsoft Visual Studio\VC98
+LIB_PATH=$(VC_DIR)\Lib
+
+INCL=/I..\include /I. /I"$(VC_DIR)\INCLUDE" /I"$(VC_DIR)\MFC\INCLUDE" /I"$(VC_DIR)\ATL\INCLUDE"
+
+CFLAGS=/D_WIN32_ $(INCL) /D_DEBUG /O2 
+
+LIBS="$(LIB_PATH)\uuid.lib" "$(LIB_PATH)\LIBC.lib" "$(LIB_PATH)\Ws2_32.lib" "$(LIB_PATH)\OLDNAMES.lib" "$(LIB_PATH)\kernel32.lib" "$(LIB_PATH)\LIBCI.lib" "$(LIB_PATH)\LIBCP.lib" "$(LIB_PATH)\LIBCID.lib"
+
+CC=cl
+
+compile.exe:lily.lex.obj lily.yacc.obj  Token_Stack.obj int_Stack.obj Labels_Stack.obj FunCfg.obj FlowName_Stack.obj ..\share\tool.obj
+	$(CC)  /o$@ lily.lex.obj lily.yacc.obj  Token_Stack.obj int_Stack.obj Labels_Stack.obj FunCfg.obj FlowName_Stack.obj  ..\share\tool.obj $(LIBS) $(CFLAGS)
+	-copy $@ ..\bin\lily_compile.exe
+#---------------------------------------------------------------
+Token_Stack.obj:Token_Stack.cpp
+	$(CC) /c /Fo$@ Token_Stack.cpp $(CFLAGS)
+FlowName_Stack.obj:FlowName_Stack.cpp
+	$(CC) /c /Fo$@ FlowName_Stack.cpp $(CFLAGS)
+int_Stack.obj:int_Stack.cpp
+	$(CC) /c /Fo$@ int_Stack.cpp $(CFLAGS)
+Labels_Stack.obj:Labels_Stack.cpp
+	$(CC) /c /Fo$@ Labels_Stack.cpp $(CFLAGS)
+lily.lex.obj:lily.lex.cpp compile.yacc.h
+	$(CC) /c /Fo$@ lily.lex.cpp $(CFLAGS)
+lily.yacc.obj:lily.yacc.cpp
+	$(CC) /c /Fo$@ lily.yacc.cpp $(CFLAGS)
+FunCfg.obj:FunCfg.cpp
+	$(CC) /c /FoFunCfg.obj FunCfg.cpp  $(CFLAGS)
+
+#---------------------------------------------------------------
+
+
+clean:
+	-del .\*.obj
+

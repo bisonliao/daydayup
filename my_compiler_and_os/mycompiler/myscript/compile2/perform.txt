@@ -1,0 +1,42 @@
+function init
+begin
+	$$x = 0.05814 / 12; #月利率
+	
+	$$A = 200000; #本金
+	$$n = 180; 	#期数
+end
+
+function ss
+begin
+	$y = $1;
+
+	
+	$A = $$A;
+
+	for ($i=0; $i < $$n; $i = $i+1;)
+	do
+		$A = $A * ( 1 + $$x) - $y;
+	endfor
+
+	if ($A < 0)
+	then
+		print ( $y, "\t", $A, "\n");
+		return 0;
+	else
+		return 1;
+	endif
+	
+end
+
+function main
+begin
+	init();
+	
+	for ($y = $$A / $$n; ss($y)==1; $y = $y + 1;)
+	do
+		$y;
+	endfor
+
+#	fgets($line, 100, 0);
+
+end

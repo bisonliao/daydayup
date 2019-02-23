@@ -1,0 +1,63 @@
+#line 1 a.txt
+#line 1 ./b.txt
+#line 1 ./c.txt
+[C_SCRIPT]
+begin
+	print("执行C_SCRIPT");
+end#line 2 ./b.txt
+[B_SCRIPT]
+begin
+	print("执行B_SCRIPT");
+	run("C_SCRIPT");
+end#line 2 a.txt
+
+[main]
+begin
+	string s;
+	s = "123456";
+	
+	print(s);
+	memblock mb1;
+	memblock mb2,mb3;
+	mb1 = str2mem(s);
+	
+	mb2 = memsub(mb1, 0,1);
+	mb3 = memsub(mb1, 0,2);
+	if (memcmp(mb2, mb3) == 1) then
+		print("相等");	
+	else
+		print("不相等");
+	endif
+	
+	run("B_SCRIPT");
+	
+	if (s != "aaa")
+	then
+	;
+	endif
+	
+	print(length(mb2));
+	print(length(mb3));
+	
+	string s1,s2;
+	s1 = mem2str(mb2);
+	s2 = mem2str(mb3);
+	print(s1,s2,s1+s2);
+	
+	int len;
+	len = length(s1) + length(s2);
+	print(len);
+	
+	print(str2mem(s1+s2));
+	
+	g_0 = mb2;
+	print(g_0);
+	
+	if (g_0 == g_1)
+	then
+	;
+	endif
+	
+	system("echo abc defdsafdsafd");
+	print("a.txt", 51);
+end

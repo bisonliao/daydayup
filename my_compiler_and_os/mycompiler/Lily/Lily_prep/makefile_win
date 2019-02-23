@@ -1,0 +1,13 @@
+CFLAGS=-D_WIN32_
+
+all:prep.exe
+
+prep.exe:prep.o test.o
+	gcc  -o prep.exe prep.o test.o
+	copy prep.exe ..\bin
+test.o:../share/tool.c
+	gcc  -c -o test.o ../share/tool.c -I../include $(CFLAGS)
+prep.o:prep.lex.c
+	gcc  -c -o prep.o prep.lex.c -I../include $(CFLAGS)
+
+

@@ -1,0 +1,8 @@
+[mult]
+begin
+	float f1,f2,f3;
+	f1 = atof(g_0);
+	f2 = atof(g_1);
+	f3 = f1 * f2;
+	g_3 = str(f3);
+end

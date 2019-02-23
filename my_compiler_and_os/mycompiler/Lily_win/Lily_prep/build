@@ -1,0 +1,5 @@
+flex -oprep.lex.c Lily_prep.lex
+gcc  -c -o test.o ../share/tool.c -I../include
+gcc  -c -o prep.o prep.lex.c -I../include
+gcc  -o prep prep.o test.o -lfl
+mv prep ../bin/

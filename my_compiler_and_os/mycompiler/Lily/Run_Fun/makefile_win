@@ -1,0 +1,17 @@
+CC=g++
+CFLAGS=-I../include -I../Lily_run
+#LIBS=../lib/liblily.so
+
+all:librun_fun.a
+
+librun_fun.a:Run_Fun.o
+	-del librun_fun.a
+	ar -qv $@ $^
+	copy librun_fun.a ..\lib\librun_fun.a
+	
+Run_Fun.o:Run_Fun.cpp
+	${CC} -c -o $@ $^ ${CFLAGS}
+
+
+clean:
+	del .\*.o

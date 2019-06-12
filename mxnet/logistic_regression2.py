@@ -107,17 +107,11 @@ for e in range(epochs):
         b = net.bias.data(ctx=ctx)[0].asscalar()
         print("!!!", w1, " ", w2, " ", b)
 
-
-
-
-
-
 ##################################################
-# save net parameters
+# save net parameters and restore
 net.save_parameters('e:/logistic2.params')
 
-
-
-
-
-
+net2 = gluon.nn.Dense(1, activation="sigmoid")
+net2.load_parameters('e:/logistic2.params',ctx = ctx)
+val_data = generate_data(1000)
+print("val date acc:", evaluate_accuracy(val_data, net2))

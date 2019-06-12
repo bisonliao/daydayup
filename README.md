@@ -13,4 +13,5 @@
 * ListenEnglish 一个学习英语用的安卓app，方便自己设置断句和跟读,InteliJ工程
 * PCMPlayer 使用AudioTrack和AudioRecord组件录制和播放PCM数据的例子，InteliJ工程
 * lame 研究lame库的一些代码
-* my_compiler_os 2004年左右的代码，当时不知道发什么疯，狂写自己的脚本语言解释器和嵌入式OS。不一定有多大参考价值，青春记忆吧，留下来。好几个目录是相似的，时间太久也搞不清是什么区别，先扔上来吧。
+* my_compiler_os 2004年左右的代码，当时冲动的实现自己的脚本语言解释器和嵌入式OS。不一定有多大参考价值，青春记忆吧，留下来。好几个目录是相似的，时间太久也搞不清是什么区别，先扔上来吧。
+* mxnet：一些练习demo，算是https://gluon.mxnet.io/学习笔记

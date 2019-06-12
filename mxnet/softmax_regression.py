@@ -63,9 +63,9 @@ def evaluate_accuracy(data_iterator, net):
 # actually, for this kind of simple data, only the
 # last Dense layer is needed
 net = gluon.nn.Dense(num_outputs)
-net.weight.lr_mult = 2.0 #这样可以修改该层参数的学习率倍数
 net.initialize(ctx=ctx)
-trainer = gluon.Trainer(net.collect_params(), "sgd")
+net.weight.lr_mult = 2.0 #杩欐牱鍙互淇敼璇ュ眰鍙傛暟鐨勫涔犵巼鍊嶆暟
+trainer = gluon.Trainer(net.collect_params(), "sgd", {"wd":0.00})
 trainer.set_learning_rate(lr)
 my_softmax_loss =gluon.loss.SoftmaxCrossEntropyLoss()
 
@@ -87,6 +87,7 @@ for e in range(epochs):
         with autograd.record():
             output = net(data) # the forward iteration
             loss = my_softmax_loss(output, label)
+
         # now , output shape is [batch_size,2]
         # loss shape is [batch_size,]
         loss.backward()

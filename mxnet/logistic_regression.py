@@ -19,11 +19,11 @@ num_inputs = 2
 num_outputs = 2
 num_examples = 200 #样本数太多（例如1万个）的话，第一次epoch就把模型训练好了，看不到随着epoch准确率明显的提升，所以我特意设置小一点
 epochs = 100
-lr = 0.05
+lr = 0.1
 ctx = mx.gpu()
 batch_size=100
 
-seed = int(time.time())
+seed = 1 #int(time.time())
 mx.random.seed(seed)
 mx.random.seed(seed, ctx)
 
@@ -38,7 +38,7 @@ def real_fn(X):
 def generate_data(data_num):
     X = nd.random_uniform(-10, 10,shape=(data_num, num_inputs),)
     #noise = 0.01 * nd.random_normal(shape=(num_examples,))
-    y = (real_fn(X)+0.5).astype("int32")
+    y = nd.round(real_fn(X))
     # load data from memory
     return gluon.data.DataLoader(gluon.data.ArrayDataset(X, y),batch_size=batch_size, shuffle=True)
 
@@ -64,18 +64,20 @@ with net.name_scope():
     net.add(gluon.nn.Dense(256, activation="relu"))# 1st layer (256 nodes)
     net.add(gluon.nn.Dense(256, activation="relu")) # 2nd hidden layer
     namedLayer = gluon.nn.Dense(num_outputs, activation="sigmoid") # give the layer a name , for access convenient
+    namedLayer.weight.lr_mult = 2.0
     net.add(namedLayer)
-net.initialize(ctx=ctx)
-trainer = gluon.Trainer(net.collect_params(), "sgd")
-trainer.set_learning_rate(lr)
+net.initialize(ctx=ctx,)
+trainer = gluon.Trainer(net.collect_params(), "sgd", {"learning_rate":0.1,"wd":0.0001}) #accept learning_rate, wd (weight decay), clip_gradient, and lr_scheduler.
+trainer.set_learning_rate(lr) #也就这个函数，没有set_wd哈，其他参数也没有函数可以改
 my_softmax_loss = gluon.loss.SoftmaxCrossEntropyLoss()
 
 
 ##################################################
 # train the network
-# question: when and who clean the gradient?
+# 不需要每次梯度清 0，因为新梯度是写进去，而不是累加
 for e in range(epochs):
     loss_sum = 0
+
     for i, (data, label) in enumerate(train_data):
         # data shape is [batch_size, input_size] : batch_size X input_size matrix
         # label shape is [batch_size, ]: (batch_size) scalars
@@ -87,8 +89,9 @@ for e in range(epochs):
         # now , output shape is [batch_size,2]
         # loss shape is [batch_size,]
         loss.backward()
-        loss_sum += nd.sum(loss).asscalar() / loss.shape[0]
+        loss_sum += nd.mean(loss).asscalar()
         trainer.step(batch_size) # update the wb parameters
+
     loss_sum = loss_sum / (i+1)
     accuracy = evaluate_accuracy(test_data, net)
     print("epoch:" ,e, " loss:", loss_sum, " acc:", accuracy)

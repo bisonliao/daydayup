@@ -38,6 +38,7 @@ def real_fn(X):
 def generate_data(data_num):
     # X的取值范围很重要，如果绝对值比较大，那么wX+b的值就大，经过sigmoid函数的导数的时候，导致梯度消失，loss值下降很慢
     # 如果X的取值范围确实很大，要做标准化处理
+    # 而且学习到的系数也不等于real_fn里的系数2，-3.4,4.2
     X = nd.random_uniform(-1, 1,shape=(data_num, num_inputs),)
     #标签 y转为1,0这样的数值后，再转为float32这一步很重要，否则后面loss的计算会报错
     # ndarray之间的相互运算，例如两个nd相加，他们的dtype要求一致，
@@ -78,7 +79,7 @@ def my_softmax_loss(output, y):
 
 ##################################################
 # train the network
-# question: when and who clean the gradient?
+# 不需要每次梯度清 0，因为新梯度是写进去，而不是累加
 for e in range(epochs):
     loss_sum = 0
     for i, (data, label) in enumerate(train_data):
@@ -95,7 +96,7 @@ for e in range(epochs):
         # now , output shape is [batch_size,2]
         # loss shape is [batch_size,]
         loss.backward()
-        loss_sum += nd.sum(loss).asscalar() / loss.shape[0]
+        loss_sum += nd.mean(loss).asscalar()
         trainer.step(batch_size) # update the wb parameters
 
     loss_sum = loss_sum / (i+1)
@@ -107,6 +108,7 @@ for e in range(epochs):
         b = net.bias.data(ctx=ctx)[0].asscalar()
         print("!!!", w1, " ", w2, " ", b)
 
+
 ##################################################
 # save net parameters and restore
 net.save_parameters('e:/logistic2.params')
@@ -115,3 +117,8 @@ net2 = gluon.nn.Dense(1, activation="sigmoid")
 net2.load_parameters('e:/logistic2.params',ctx = ctx)
 val_data = generate_data(1000)
 print("val date acc:", evaluate_accuracy(val_data, net2))
+
+
+
+
+

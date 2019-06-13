@@ -61,7 +61,7 @@ my_square_loss = gluon.loss.L2Loss()
 
 ##################################################
 # train the network
-# question: when and who clean the gradient?
+# 不需要每次梯度清 0，因为新梯度是写进去，而不是累加
 for e in range(epochs):
     loss_sum = 0
     for i, (data, label) in enumerate(train_data):
@@ -75,7 +75,7 @@ for e in range(epochs):
         # now , output shape is [batch_size,1]
         # loss shape is [batch_size,]
         loss.backward()
-        loss_sum += nd.sum(loss).asscalar() / loss.shape[0]
+        loss_sum += nd.mean(loss).asscalar()
         trainer.step(batch_size) # update the wb parameters
     loss_sum = loss_sum / (i+1)
     print("epoch["+str(e)+"], loss:"+str(loss_sum))

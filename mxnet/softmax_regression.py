@@ -2,6 +2,10 @@
 使用mxnet演示多分类回归
 原来简单的一层全连接层就可以实现对手写字体的分类辨识，准确率可以达到92%以上
 This model is sometimes called multiclass logistic regression. Other common names for it include softmax regression and multinomial regression.
+
+http://zh.gluon.ai/index.html
+https://gluon.mxnet.io/
+
 """
 import mxnet.gluon as gluon
 import mxnet as mx
@@ -60,8 +64,6 @@ def evaluate_accuracy(data_iterator, net):
 
 ##################################################
 # define network
-# actually, for this kind of simple data, only the
-# last Dense layer is needed
 net = gluon.nn.Dense(num_outputs)
 net.initialize(ctx=ctx)
 net.weight.lr_mult = 2.0 #这样可以修改该层参数的学习率倍数
@@ -73,7 +75,12 @@ my_softmax_loss =gluon.loss.SoftmaxCrossEntropyLoss()
 
 ##################################################
 # train the network
-# question: when and who clean the gradient?
+# 不需要每次梯度清 0，因为新梯度是写进去，而不是累加
+
+#默认是write，改为累加
+for p in net.collect_params().values():
+    p.grad_req="add"
+
 
 for e in range(epochs):
     loss_sum = 0
@@ -90,9 +97,11 @@ for e in range(epochs):
 
         # now , output shape is [batch_size,2]
         # loss shape is [batch_size,]
-        loss.backward()
-        loss_sum += nd.sum(loss).asscalar() / loss.shape[0]
-        trainer.step(batch_size) # update the wb parameters
+        loss.backward() # 可以传入一个同loss.grad形状的矩阵，作为梯度的数乘的系数，默认为1，所谓的头梯
+        loss_sum += nd.mean(loss).asscalar()
+        if (i%2)==0 and i != 0:
+            trainer.step(batch_size*2) # update the wb parameters
+            net.collect_params().zero_grad()
 
     loss_sum = loss_sum / (i+1)
     accuracy = evaluate_accuracy(test_data, net)

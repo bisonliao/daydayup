@@ -103,6 +103,72 @@ class MyFileDataset(data.Dataset):
 train_data = gluon.data.DataLoader(MyFileDataset(), batch_size=batch_size, shuffle=True)
 ```
 
+### Train mode and predict mode
+
+数据在net中前向传播的时候，有两种模式，train mode和predict模式，mxnet默认是predict模式。例如这段代码就是predict模式，打印显示false：
+
+```python
+ctx=mx.gpu(0)
+class MLP(gluon.Block):
+    def __init__(self, **kwargs):
+        super(MLP, self).__init__(**kwargs)
+        with self.name_scope():
+            self.dense0 = gluon.nn.Dense(64)
+            self.dense1 = gluon.nn.Dense(64)
+            self.drop0 = gluon.nn.Dropout(0.5)
+            self.dense2 = gluon.nn.Dense(10)
+
+    def forward(self, x):
+        x = nd.relu(self.dense0(x))
+        x = nd.relu(self.dense1(x))
+        x = self.drop0(x)
+        x = self.dense2(x)
+        return x
+
+net = MLP()
+net.load_parameters('e:/softmax.params', ctx=ctx)
+inputdata = nd.ones(shape=(64,784),ctx=ctx)
+net(inputdata)
+print(autograd.is_training())
+```
+
+autograd.record()函数的第一个参数就是指定是否是training_mode，默认值为True。
+
+模式会影响Dropout层，当predict_mode时，Dropout层不工作，可以用下面的代码验证：
+
+```python
+net = MLP()
+net.initialize(ctx=ctx)
+
+inputdata = nd.array([[1,2,3,4]],ctx=ctx)
+with autograd.train_mode():
+    output = net(inputdata)
+    print(output)
+    output = net(inputdata)
+    print(output)
+exit(0)
+```
+
+当train mode的时候，由于dropout随机丢弃一些节点值，所以两次output的值不一样；如果是predict mode，两次output的值就是一样的。
+
+在Caffe里，Dropout层的逻辑也是这样的，非Train模式不工作：
+
+```c++
+if (this->phase_ == TRAIN) {
+    // Create random numbers
+    caffe_rng_bernoulli(count, 1. - threshold_, mask);
+    for (int i = 0; i < count; ++i) {
+      top_data[i] = bottom_data[i] * mask[i] * scale_;
+    }
+  } else {
+    caffe_copy(bottom[0]->count(), bottom_data, top_data);
+  }
+```
+
+
+
+
+
 ### 坑
 
 1、ndarray之间的相互运算，例如两个nd相加，他们的dtype要求一致，否则报错，类似这样的：

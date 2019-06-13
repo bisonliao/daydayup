@@ -26,6 +26,8 @@ print(namedLayer.weight.grad(ctx=ctx)[0,1])
 print(namedLayer.bias.grad(ctx=ctx)[0])
 ```
 
+默认情况下不需要手动清理梯度，但mxnet的网络的参数需要手动调用initialize()函数来初始化，或者load_parameters()从参数文件中加载。
+
 ### 学习率、学习率倍数等超参数
 
 可以这样来修改某参数的学习率倍数，默认是1.0：
@@ -101,6 +103,16 @@ class MyFileDataset(data.Dataset):
 
 ```pyton
 train_data = gluon.data.DataLoader(MyFileDataset(), batch_size=batch_size, shuffle=True)
+```
+
+### 自定义layer
+
+gluon.Block是mxnet里非常重要的类，重要性与NDArray不相上下。
+
+自定义layer就是写一个继承Block的子类，具体做法：
+
+```
+https://gluon.mxnet.io/chapter03_deep-neural-networks/custom-layer.html#Defining-a-(toy)-custom-layer
 ```
 
 ### Train mode and predict mode

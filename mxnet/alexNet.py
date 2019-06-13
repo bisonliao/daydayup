@@ -39,12 +39,12 @@ def transformer(data, label):
 dataset = gluon.data.vision.CIFAR10('./data', train=True, transform=transformer)
 train_example_num = len(dataset)
 train_data = gluon.data.DataLoader(dataset,
-    batch_size=batch_size, shuffle=True, last_batch='discard')
+    batch_size=batch_size, shuffle=True, last_batch='discard',pin_memory=True)
 
 dataset = gluon.data.vision.CIFAR10('./data', train=False, transform=transformer)
 test_example_num = len(dataset)
 test_data = gluon.data.DataLoader(dataset,
-    batch_size=batch_size, shuffle=False, last_batch='discard')
+    batch_size=10, shuffle=False, last_batch='discard',pin_memory=True)
 
 print("samples number:",train_example_num, " ", test_example_num)
 
@@ -58,6 +58,8 @@ def evaluate_accuracy(data_iterator, net):
         output = nd.softmax(output)
         predictions = output.argmax(axis=1)
         acc.update(preds=predictions, labels=label)
+        if i > 10:
+            break
     em = acc.get()
     return em[1]
 
@@ -153,11 +155,31 @@ labeltxt = [
 "ship",
 "truck"
 ]
+output = output.astype("int32").asnumpy()
+for i in range(len(output)):
+    index =  output[i]
+    print(labeltxt[index])
 
-print(output)
 
 import matplotlib.pyplot as plt
 
+def chw2hwc(data):
+    c=data.shape[0]
+    h=data.shape[1]
+    w=data.shape[2]
+    ch1 = nd.flatten(data[0,:,:]).asnumpy()
+    if c == 3 :
+        ch2 = nd.flatten(data[1,:,:]).asnumpy()
+        ch3 = nd.flatten(data[2, :, :]).asnumpy()
+    else:
+        ch2 = nd.flatten(data[0, :, :]).asnumpy()
+        ch3 = nd.flatten(data[0, :, :]).asnumpy()
+
+    data = nd.array([ch1,ch2,ch3]).T
+    data = nd.flatten(data)
+    data = data.reshape((h,w,c))
+    data = mx.image.imresize(data, 32, 32) / 255.0
+    return data
 
 
 def show_pic(data):
@@ -167,6 +189,7 @@ def show_pic(data):
     pic = data.copy()
     for i in range(pic.shape[0]):
         onepic = pic[i]
+        onepic = chw2hwc(onepic)
         plt.imshow(onepic.asnumpy())
         plt.show()
     return

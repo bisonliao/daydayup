@@ -36,15 +36,13 @@ def gene_train_examples():
     siamese_data=[]
     dataset1 = mx.gluon.data.vision.MNIST(train=True, transform=transform)
     dataset2 = mx.gluon.data.vision.MNIST(train=True, transform=transform)
-    full = 0
+    file_index = 1
     for it1, (data1, label1) in enumerate(dataset1):
         data1 = data1.reshape((1,28,28))
-        if full > 0:
-            break
+
         for it2, (data2, label2) in enumerate(dataset2):
             data2 = data2.reshape((1, 28, 28))
-            if full>0:
-                break
+
             if it1 == it2:
                 continue
             if label1 == label2:
@@ -63,7 +61,7 @@ def gene_train_examples():
                 label.append(0.0)
                 neg_num += 1
 
-            if (pos_num + neg_num) >= batch_size:
+            if (pos_num + neg_num) >= batch_size: # get a whole batch
                 left_nd = nd.zeros(shape = (batch_size, 1, 28, 28))
                 for i in range(batch_size):
                     left_nd[i] = left[i]
@@ -76,8 +74,7 @@ def gene_train_examples():
                 label_nd = nd.array(label)
 
                 siamese_data.append((left_nd, right_nd, label_nd))
-                if len(siamese_data) >= 1000:
-                    full = 1
+
                 left = []
                 right = []
                 label = []
@@ -85,17 +82,28 @@ def gene_train_examples():
                 neg_num = 0
                 break
 
-        print(len(siamese_data))
-        random.shuffle(siamese_data)
+        if len(siamese_data) >= 1000: # get a whole data set
+            path="./data/siamese_data_{}.pickle".format(file_index)
+            file_index +=1
+            random.shuffle(siamese_data)
+            with open(path, "wb") as f:
+                pickle.dump(siamese_data, f)
+            siamese_data = []
+        if file_index > 2 :
+            break;
 
-    with open("./data/train_data.pickle", "wb") as f:
-        pickle.dump(siamese_data, f)
+
+
 
 #gene_train_examples()
+#exit(0)
 
 train_data=[]
-with open("./data/train_data.pickle", "rb") as f:
+test_data = []
+with open("./data/siamese_data_1.pickle", "rb") as f:
     train_data = pickle.load(f)
+with open("./data/siamese_data_2.pickle", "rb") as f:
+    test_data = pickle.load(f)
 
 ##################################################
 # define network
@@ -170,7 +178,7 @@ for e in range(epochs):
         trainer.step(batch_size) # update the wb parameters
 
     loss_sum = loss_sum / (i+1)
-    accuracy = evaluate_accuracy(train_data, net)
+    accuracy = evaluate_accuracy(test_data, net)
     print("epoch:", e, " loss:", loss_sum, " acc:", accuracy)
 
 

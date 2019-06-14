@@ -105,6 +105,16 @@ class MyFileDataset(data.Dataset):
 train_data = gluon.data.DataLoader(MyFileDataset(), batch_size=batch_size, shuffle=True)
 ```
 
+DataLoader也很方便自己实现，只要是满足python的可迭代的对象即可，兼容训练的时候通过enumerate()操作访问data loader中的数据。windows下mxnet提供的DataLoader不支持num_workers=cpu_nr参数，会抛异常，这样访问数据的效率就比较低了，GPU跑不满。
+
+详细文档可见：
+
+```
+https://mxnet.incubator.apache.org/versions/master/tutorials/gluon/datasets.html
+```
+
+
+
 ### 自定义layer
 
 gluon.Block是mxnet里非常重要的类，重要性与NDArray不相上下。

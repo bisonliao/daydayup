@@ -187,7 +187,75 @@ if (this->phase_ == TRAIN) {
   }
 ```
 
+### 获取中间层的输出
 
+我们有时候需要获得中间层的输出，例如查看卷积网络的feature map。mxnet下怎么做呢？
+
+只能是逐层的前向传播，遇到目标层的输出就保存起来，下面是样例代码：
+
+```python
+import mxnet as mx
+import mxnet.ndarray as nd
+import gluoncv
+from mxnet.gluon.model_zoo import vision
+
+resnet18 = vision.resnet18_v1(pretrained=True)
+print(resnet18)
+
+# input image in x
+filename = 'th.jpg'
+img = mx.image.imread(filename)
+x = gluoncv.data.transforms.presets.imagenet.transform_eval(img)
+
+for i in range(len(resnet18.features)):
+    layer = resnet18.features[i]
+    x = layer(x)
+    print(type(x),":",x.shape)
+x = resnet18.output(x) #最后一层别忘记了
+print(nd.topk(x, k=5))
+```
+
+可以看看  print(resnet18) 的输出：
+
+```
+ResNetV1(
+  (output): Dense(512 -> 1000, linear)
+  (features): HybridSequential(
+    (0): Conv2D(3 -> 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+    (1): BatchNorm(momentum=0.9, use_global_stats=False, axis=1, eps=1e-05, fix_gamma=False, in_channels=64)
+    (2): Activation(relu)
+    (3): MaxPool2D(size=(3, 3), stride=(2, 2), padding=(1, 1), ceil_mode=False)
+    (4): HybridSequential(
+      (0): BasicBlockV1(
+        (body): HybridSequential(
+          (0): Conv2D(64 -> 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (1): BatchNorm(momentum=0.9, use_global_stats=False, axis=1, eps=1e-05, fix_gamma=False, in_channels=64)
+          (2): Activation(relu)
+          (3): Conv2D(64 -> 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (4): BatchNorm(momentum=0.9, use_global_stats=False, axis=1, eps=1e-05, fix_gamma=False, in_channels=64)
+        )
+      )
+      (1): BasicBlockV1(
+        (body): HybridSequential(
+          (0): Conv2D(64 -> 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (1): BatchNorm(momentum=0.9, use_global_stats=False, axis=1, eps=1e-05, fix_gamma=False, in_channels=64)
+          (2): Activation(relu)
+          (3): Conv2D(64 -> 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (4): BatchNorm(momentum=0.9, use_global_stats=False, axis=1, eps=1e-05, fix_gamma=False, in_channels=64)
+        )
+      )
+    )
+    # ...这里省略几千字
+    (8): GlobalAvgPool2D(size=(1, 1), stride=(1, 1), padding=(0, 0), ceil_mode=True)
+  )
+)
+```
+
+可以看到其架构不只是stack，还有层级关系，圆括号里带数字的基本上就是用下标访问，圆括号里带标识符（例如body），就通过属性名访问，例如：
+
+```python
+resnet18.features[4][0].body[2]
+```
 
 
 

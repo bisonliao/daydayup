@@ -29,19 +29,23 @@ args_bptt = 5
 args_dropout = 0.2
 args_save = 'char_forecast.param'
 
-
+###############################################
+#generate a one-hot matrix
 def one_hots(numerical_list, vocab_size):
     result = nd.zeros((len(numerical_list), vocab_size), ctx=context)
     for i, idx in enumerate(numerical_list):
         result[i, idx] = 1.0
     return result
 
+# convert one-hot embeding code to readable text
 def textify(embedding, character_list):
     result = ""
     indices = nd.argmax(embedding, axis=1).asnumpy()
     for idx in indices:
         result += chr(character_list[int(idx)])
     return result
+
+# clean the text, only alpha and space is left
 def clean(text):
     result=bytes()
     for i in range(len(text)):
@@ -60,6 +64,7 @@ character_list = list(set(nietzsche)) #distinct char
 vocab_size = len(character_list)
 print("voc_size:", vocab_size)
 
+# genenerate train dataset ,shape is  [batch_number, seq_len, batch_sz, input_size]
 def gene_data():
 
     character_dict = {}
@@ -99,6 +104,7 @@ else:
 
 train_data, train_label,test_data, test_label = dataset
 
+# check the  relation between data and label
 def check_data(data, label):
     tmplist = nd.zeros((seq_length,vocab_size))
     for i in range(seq_length):
@@ -115,13 +121,9 @@ check_data(train_data, train_label)
 check_data(test_data, test_label)
 
 
-
-
-
-
+###############################################
+# define the rnn model
 class RNNModel(gluon.Block):
-    """A model with an encoder, recurrent layer, and a decoder."""
-
     def __init__(self, mode, vocab_size, num_embed, num_hidden,
                  num_layers, dropout=0.5, **kwargs):
         super(RNNModel, self).__init__(**kwargs)
@@ -160,6 +162,7 @@ trainer = gluon.Trainer(model.collect_params(), 'sgd',
                         {'learning_rate': args_lr, 'momentum': 0, 'wd': 0})
 loss = gluon.loss.SoftmaxCrossEntropyLoss()
 
+# detach SDG graph，avoid backward 
 def detach(hidden):
     if isinstance(hidden, (tuple, list)):
         hidden = [i.detach() for i in hidden]
@@ -167,6 +170,7 @@ def detach(hidden):
         hidden = hidden.detach()
     return hidden
 
+# get the test loss
 def eval(test_data,test_label):
     total_L = 0.0
     ntotal = 0
@@ -182,6 +186,7 @@ def eval(test_data,test_label):
         ntotal += L.size
     return total_L / ntotal
 
+# get the test accuracy
 def evaluate_accuracy(test_data,test_label, net):
     acc = mx.metric.Accuracy()
     hidden = model.begin_state(func=mx.nd.zeros, batch_size=batch_size, ctx=context)
@@ -197,7 +202,8 @@ def evaluate_accuracy(test_data,test_label, net):
     em = acc.get()
     return em[1]
 
-
+########################################################
+# train the model
 def train():
     best_val = float("Inf")
     for epoch in range(args_epochs):

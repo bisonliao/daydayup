@@ -62,7 +62,7 @@ def gene_data():
         a = np.random.randint(0, 65535)
         b = np.random.randint(0, 65535)
         c = a+b
-        inputstr = "%08d+%07d"%(a,b)
+        inputstr = "%d+%d"%(a,b)
         inputstrlen = len(inputstr)
         for j in range(seq_length - inputstrlen):
             inputstr = "0" + inputstr

@@ -1,6 +1,6 @@
 '''
 让rnn学会做整数加法
-最后只能学习一个模型，计算出比较接近的两个数的和
+使用adam而不是sgd是关键所在
 '''
 import mxnet as mx
 import mxnet.ndarray as nd
@@ -16,11 +16,35 @@ import time
 import math
 import pickle
 
-context = mx.gpu(0)
-batch_size = 64 #batch size改动的话，也需要改动lr
-num_batches = 200
+#####  grp #1 acc = 92% ##################################
+batch_size = 64
+num_batches = 100
 args_lr = 0.001
-args_epochs = 100
+args_epochs = 50
+max_added = 100  # 加数的最大值，很关键
+def get_lr(ep):
+    if ep >= 20 and ep < 40:
+        return args_lr / 10
+    elif ep >=40:
+        return args_lr / 100
+    else:
+        return args_lr
+
+###### grp #2 acc = 74% ####################################
+'''batch_size = 64
+num_batches = 300
+args_lr = 0.001
+args_epochs = 80
+max_added = 255  # 加数的最大值，很关键
+def get_lr(ep):
+    if ep >= 10 and ep < 20:
+        return args_lr / 10
+    elif ep >=20:
+        return args_lr / 100
+    else:
+        return args_lr'''
+###########################################################
+context = mx.gpu(0)
 vocab_size = 11  # 0-9 and +
 seq_length = 16
 args_model = 'lstm'
@@ -30,11 +54,9 @@ args_clip = 0.2
 args_dropout = 0.0001
 args_save = 'rnn_addition.param'
 
-# 加数的最大值，
-# 取100的时候，有1万种可能，用64X100个sample可以训练得到92%的准确率
-# 取255的时候，有6.5万种可能，用64X100个sample可以训练得到60%左右的准确率，错误的得数比较接近正确答案
-# 取65535的时候，有42亿中可能，用64X100个sample基本不可能训练出像样的模型
-max_added = 255
+
+
+
 
 ###############################################
 def char_to_vect():
@@ -131,8 +153,10 @@ class RNNModel(gluon.Block):
             else:
                 raise ValueError("Invalid mode %s. Options are rnn_relu, "
                                  "rnn_tanh, lstm, and gru"%mode)
+            # 加不加这一层效果差不太多，加了这层会好几个百分点
             self.fc = nn.Dense(512, in_units=num_hidden)
             self.output = nn.Dense(1, in_units=512)
+            #self.output = nn.Dense(1, in_units=num_hidden)
             self.num_hidden = num_hidden
 
     def forward(self, inputs, hidden):
@@ -204,8 +228,7 @@ def train():
         total_L = 0.0
         start_time = time.time()
 
-        if epoch % 20 == 0 and epoch != 0:
-            trainer.set_learning_rate(args_lr / (epoch))
+        trainer.set_learning_rate(get_lr(epoch))
 
         hidden = model.begin_state(func=mx.nd.zeros, batch_size=batch_size, ctx=context)
         for  i in range(train_data.shape[0]):

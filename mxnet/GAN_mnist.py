@@ -1,3 +1,7 @@
+'''
+使用GAN网络，生成mnist这样的手写图片，或者CIFAR这样的图片
+'''
+
 import mxnet as mx
 from mxnet import nd
 from mxnet import gluon, autograd
@@ -25,17 +29,22 @@ CTX = mx.gpu(0)
 CLIP_GRADIENT = 10.0
 IMAGE_SIZE = 64
 
+DATA_SOURCE = "cifar"  # cifar or mnist
+
 ########################################################
 # training samples source
 def transform(data, label):
-    #data shape is (28, 28, 1), transfer to (1, 28, 28),
-    # because conv need input shape is (N, C, H, W)
     data = mx.image.imresize(data, IMAGE_SIZE, IMAGE_SIZE)
-    data = data.reshape(1,IMAGE_SIZE,IMAGE_SIZE)
-    data = nd.tile(data, reps=(3,1,1)) # 3 channels BGR
+    if DATA_SOURCE=='cifar':
+        data = mx.nd.transpose(data, (2, 0, 1))
+    else:
+        data = data.reshape(1,IMAGE_SIZE,IMAGE_SIZE)
+        data = nd.tile(data, reps=(3,1,1)) # 3 channels BGR
     return data.astype(np.float32)/128-1, label.astype(np.float32)
-
-dataset = mx.gluon.data.vision.MNIST(train=True, transform=transform)
+if DATA_SOURCE=='cifar':
+    dataset = gluon.data.vision.CIFAR10('./data', train=True, transform=transform)
+else:
+    dataset = mx.gluon.data.vision.MNIST(train=True, transform=transform)
 train_example_num = len(dataset)
 print("train samples number:", train_example_num)
 train_data = mx.gluon.data.DataLoader(dataset, BATCH_SIZE, shuffle=True)
@@ -248,12 +257,15 @@ for epoch in range(NUM_EPOCHS):
         g_trainer.step(BATCH_SIZE)
 
         # print log infomation every 100 batches
-        if i % 100 == 0:
+        if i % 200 == 0:
             name, acc = metric.get()
             logging.info('discriminator loss = %f, generator loss = %f, \
                           binary training acc = %f at iter %d epoch %d',
                          nd.mean(errD).asscalar(), nd.mean(errG).asscalar(), acc, i, epoch)
         if i == 0:
-            save_image(fake_image, epoch, IMAGE_SIZE, BATCH_SIZE, OUTPUT_DIR)
+            if epoch == 0 :
+                save_image(data, epoch, IMAGE_SIZE, BATCH_SIZE, OUTPUT_DIR)
+            else:
+                save_image(fake_image, epoch, IMAGE_SIZE, BATCH_SIZE, OUTPUT_DIR)
 
     metric.reset()

@@ -28,6 +28,157 @@ print(namedLayer.bias.grad(ctx=ctx)[0])
 
 默认情况下不需要手动清理梯度，但mxnet的网络的参数需要手动调用initialize()函数来初始化，或者load_parameters()从参数文件中加载。
 
+### 自动求解梯度与自定义的backward
+
+with autograd.record()会跟踪代码块范围内NDArray的相关操作，每个操作都有对应的反向传播函数，例如下面的代码
+
+1. mean()函数对应的反向传播梯度是1/N（N是元素个数），
+2. max()函数的梯度，类似max pooling，会有mask记录哪个元素被取值，对应的梯度为1，其他为0：
+
+```python
+x = nd.array([[1,2,3],[3,2,1]])
+x.attach_grad()
+with autograd.record(False):
+    y =  nd.mean(x)
+    y.backward()
+
+print("y:", y)
+print("grad:", x.grad)
+```
+
+输出如下：
+
+```
+y: 
+[2.]
+<NDArray 1 @cpu(0)>
+grad: 
+[[0.16666667 0.16666667 0.16666667]
+ [0.16666667 0.16666667 0.16666667]]
+<NDArray 2x3 @cpu(0)>
+```
+
+```python
+x = nd.array([[1,2,3],[3,2,1]])
+x.attach_grad()
+with autograd.record(False):
+    y =  nd.max(x)
+    y.backward()
+
+print("y:", y)
+print("grad:", x.grad)
+```
+
+输出如下：
+
+```
+y: 
+[3.]
+<NDArray 1 @cpu(0)>
+grad: 
+[[0. 0. 1.]
+ [1. 0. 0.]]
+<NDArray 2x3 @cpu(0)>
+```
+
+有一点不好理解的是下面的代码：
+
+```python
+x = nd.array([[1,2,3],[3,2,1]])
+x.attach_grad()
+with autograd.record(False):
+    y =  nd.mean(x) + 2 * x
+    y.backward()
+
+print("y:", y)
+print("grad:", x.grad) #这里显示梯度为3，而不是我们理解的2+1/6
+
+# 根据梯度的定义，自变量加上一个小小的delta，看看因变量变化多少
+# 发现确实变化了3倍，而不是2.666倍
+x = x + 0.00001
+yy = nd.mean(x) + 2 * x
+print(yy - y)
+
+# 但这样又怎么解释呢？
+x = x + nd.array([[0.00001, 0, 0],[0,0,0]])
+yy = nd.mean(x) + 2 * x
+print(yy - y)
+```
+
+大多数时候，我们前向传播用NDArray已经定义好的函数和运算符来完成，不需要我们关注和实现反向传播，mxnet自动帮我们搞定。主要在以下场景需要注意尽量用NDArray成员函数：
+
+1. 继承自Block的自定义的网络类的forward函数里
+2. 继承自Block的自定义层的forward函数里
+3. 自己定义的loss函数
+4. with autograd.record() 的代码块里
+
+例如我在实现孪生网络的loss函数时候，要尽量用NDArray的已有成员函数来完成，如果用一些循环语句对各个元素逐个操作（例如求解两个hash之间的距离d），那么autograd就不知道该怎么对该loss函数做反向传播了：
+
+```python
+def my_softmax_loss(l_o, r_o, y):
+    margin = 1.0
+    d = nd.norm(l_o - r_o, axis=1) #
+    dd = nd.relu(margin -d )
+    l = y*d*d+(1-y)*dd*dd
+    return l
+```
+
+有时候前向传播计算太过奇特，无法用NDArray成员函数来组合，那就要自己实现backward函数了。
+
+方法是自定义一个继承自mxnet.autograd.Function的子类，实现forward和backward函数。
+
+以自定义sigmoid为例：
+
+```python
+class sigmoid(mx.autograd.Function):
+    def forward(self, x):
+        y = 1 / (1 + mx.nd.exp(-x))
+        self.save_for_backward(y)
+        return y
+
+    def backward(self, dy):
+        # backward takes as many inputs as forward's return value,
+        # and returns as many NDArrays as forward's arguments.
+        y, = self.saved_tensors
+        return dy * y * (1-y)
+    
+func = sigmoid()
+x = mx.nd.random.uniform(shape=(10,))
+x.attach_grad()
+
+with mx.autograd.record():
+    m = func(x)
+    m.backward()
+dx = x.grad.asnumpy()
+```
+
+详细见：
+
+```
+https://beta.mxnet.io/api/gluon-related/_autogen/mxnet.autograd.Function.html
+```
+
+我一开始以为在继承自Block或者Loss类的自定义子类中实现backward方法能够达到这个目的，实际上不可以！
+
+如果要修改某个自定义层（Block的子类）的backward计算过程，例如想实现自定义的sigmoid正反双向传播，直接使用上面自定义的sigmoid类即可：
+
+在这个自定义层的forward函数中调用sigmoid的\_\_call\_\_即可，autograd在反向传播的时候会自动调用到sigmiod类的backward函数，类似这样的：
+
+```python
+class MyLayer(block.Block):
+    def __init__(self,  **kwargs):
+        super(MyLayer, self).__init__(**kwargs)
+        self.func = sigmoid()
+
+    def forward(self, x):
+        print("forward is called")
+        return self.func(x)
+```
+
+似乎gluon接口里只有上面一种方式来实现，非gluon接口似乎还可以使用什么自定义的Op子类，这个我没有研究。
+
+
+
 ### 学习率、学习率倍数等超参数
 
 可以这样来修改某参数的学习率倍数，默认是1.0：

@@ -12,6 +12,7 @@ import logging
 import argparse
 import numpy as np
 import math
+import mxnet.gluon.nn as nn
 
 import imageio
 
@@ -33,6 +34,7 @@ DATA_SOURCE = "cifar"  # cifar or mnist
 
 ########################################################
 # training samples source
+
 def transform(data, label):
     data = mx.image.imresize(data, IMAGE_SIZE, IMAGE_SIZE)
     if DATA_SOURCE=='cifar':
@@ -50,116 +52,53 @@ print("train samples number:", train_example_num)
 train_data = mx.gluon.data.DataLoader(dataset, BATCH_SIZE, shuffle=True)
 
 ###########################################################
-# define the model
-class SNConv2D(Block):
-    """ Customized Conv2D to feed the conv with the weight that we apply spectral normalization """
+# build the generator
+nc = 3
+ngf = 64
+netG = nn.Sequential()
+with netG.name_scope():
+    # input is Z, going into a convolution
+    netG.add(nn.Conv2DTranspose(ngf * 8, 4, 1, 0, use_bias=False))
+    netG.add(nn.BatchNorm())
+    netG.add(nn.Activation('relu'))
+    # state size. (ngf*8) x 4 x 4
+    netG.add(nn.Conv2DTranspose(ngf * 4, 4, 2, 1, use_bias=False))
+    netG.add(nn.BatchNorm())
+    netG.add(nn.Activation('relu'))
+    # state size. (ngf*8) x 8 x 8
+    netG.add(nn.Conv2DTranspose(ngf * 2, 4, 2, 1, use_bias=False))
+    netG.add(nn.BatchNorm())
+    netG.add(nn.Activation('relu'))
+    # state size. (ngf*8) x 16 x 16
+    netG.add(nn.Conv2DTranspose(ngf, 4, 2, 1, use_bias=False))
+    netG.add(nn.BatchNorm())
+    netG.add(nn.Activation('relu'))
+    # state size. (ngf*8) x 32 x 32
+    netG.add(nn.Conv2DTranspose(nc, 4, 2, 1, use_bias=False))
+    netG.add(nn.Activation('tanh'))
+    # state size. (nc) x 64 x 64
 
-    def __init__(self, num_filter, kernel_size,
-                 strides, padding, in_channels,
-                 ctx=mx.cpu(), iterations=1):
-
-        super(SNConv2D, self).__init__()
-
-        self.num_filter = num_filter
-        self.kernel_size = kernel_size
-        self.strides = strides
-        self.padding = padding
-        self.in_channels = in_channels
-        self.iterations = iterations
-        self.ctx = ctx
-
-        with self.name_scope():
-            # init the weight
-            self.weight = self.params.get('weight', shape=(
-                num_filter, in_channels, kernel_size, kernel_size))
-            self.u = self.params.get(
-                'u', init=mx.init.Normal(), shape=(1, num_filter))
-
-    def _spectral_norm(self):
-        """ spectral normalization """
-        w = self.params.get('weight').data(self.ctx)
-        w_mat = nd.reshape(w, [w.shape[0], -1])
-
-        _u = self.u.data(self.ctx)
-        _v = None
-
-        for _ in range(POWER_ITERATION):
-            _v = nd.L2Normalization(nd.dot(_u, w_mat))
-            _u = nd.L2Normalization(nd.dot(_v, w_mat.T))
-
-        sigma = nd.sum(nd.dot(_u, w_mat) * _v)
-        if sigma == 0.:
-            sigma = EPSILON
-
-        with autograd.pause():
-            self.u.set_data(_u)
-
-        return w / sigma
-
-    def forward(self, x):
-        # x shape is batch_size x in_channels x height x width
-        return nd.Convolution(
-            data=x,
-            weight=self._spectral_norm(),
-            kernel=(self.kernel_size, self.kernel_size),
-            pad=(self.padding, self.padding),
-            stride=(self.strides, self.strides),
-            num_filter=self.num_filter,
-            no_bias=True
-        )
-
-
-def get_generator():
-    """ construct and return generator """
-    g_net = gluon.nn.Sequential()
-    with g_net.name_scope():
-
-        g_net.add(gluon.nn.Conv2DTranspose(
-            channels=512, kernel_size=4, strides=1, padding=0, use_bias=False))
-        g_net.add(gluon.nn.BatchNorm())
-        g_net.add(gluon.nn.LeakyReLU(0.2))
-
-        g_net.add(gluon.nn.Conv2DTranspose(
-            channels=256, kernel_size=4, strides=2, padding=1, use_bias=False))
-        g_net.add(gluon.nn.BatchNorm())
-        g_net.add(gluon.nn.LeakyReLU(0.2))
-
-        g_net.add(gluon.nn.Conv2DTranspose(
-            channels=128, kernel_size=4, strides=2, padding=1, use_bias=False))
-        g_net.add(gluon.nn.BatchNorm())
-        g_net.add(gluon.nn.LeakyReLU(0.2))
-
-        g_net.add(gluon.nn.Conv2DTranspose(
-            channels=64, kernel_size=4, strides=2, padding=1, use_bias=False))
-        g_net.add(gluon.nn.BatchNorm())
-        g_net.add(gluon.nn.LeakyReLU(0.2))
-
-        g_net.add(gluon.nn.Conv2DTranspose(channels=3, kernel_size=4, strides=2, padding=1, use_bias=False))
-        g_net.add(gluon.nn.Activation('tanh'))
-
-    return g_net
-
-
-def get_descriptor(ctx):
-    """ construct and return descriptor """
-    d_net = gluon.nn.Sequential()
-    with d_net.name_scope():
-
-        d_net.add(SNConv2D(num_filter=64, kernel_size=4, strides=2, padding=1, in_channels=3, ctx=ctx))
-        d_net.add(gluon.nn.LeakyReLU(0.2))
-
-        d_net.add(SNConv2D(num_filter=128, kernel_size=4, strides=2, padding=1, in_channels=64, ctx=ctx))
-        d_net.add(gluon.nn.LeakyReLU(0.2))
-
-        d_net.add(SNConv2D(num_filter=256, kernel_size=4, strides=2, padding=1, in_channels=128, ctx=ctx))
-        d_net.add(gluon.nn.LeakyReLU(0.2))
-
-        d_net.add(SNConv2D(num_filter=512, kernel_size=4, strides=2, padding=1, in_channels=256, ctx=ctx))
-        d_net.add(gluon.nn.LeakyReLU(0.2))
-
-        d_net.add(SNConv2D(num_filter=1, kernel_size=4, strides=1, padding=0, in_channels=512, ctx=ctx))
-
-    return d_net
+# build the discriminator
+ndf = 64
+netD = nn.Sequential()
+with netD.name_scope():
+    # input is (nc) x 64 x 64
+    netD.add(nn.Conv2D(ndf, 4, 2, 1, use_bias=False))
+    netD.add(nn.LeakyReLU(0.2))
+    # state size. (ndf) x 32 x 32
+    netD.add(nn.Conv2D(ndf * 2, 4, 2, 1, use_bias=False))
+    netD.add(nn.BatchNorm())
+    netD.add(nn.LeakyReLU(0.2))
+    # state size. (ndf) x 16 x 16
+    netD.add(nn.Conv2D(ndf * 4, 4, 2, 1, use_bias=False))
+    netD.add(nn.BatchNorm())
+    netD.add(nn.LeakyReLU(0.2))
+    # state size. (ndf) x 8 x 8
+    netD.add(nn.Conv2D(ndf * 8, 4, 2, 1, use_bias=False))
+    netD.add(nn.BatchNorm())
+    netD.add(nn.LeakyReLU(0.2))
+    # state size. (ndf) x 4 x 4
+    netD.add(nn.Conv2D(1, 4, 1, 0, use_bias=False))
 ###########################################################
 # train
 def save_image(data, epoch, image_size, batch_size, output_dir, padding=2):
@@ -198,16 +137,12 @@ def facc(label, pred):
 mx.random.seed(random.randint(1, 10000))
 logging.basicConfig(level=logging.DEBUG)
 
-# create output dir
-try:
-    os.makedirs(OUTPUT_DIR)
-except OSError:
-    pass
+
 
 
 # get model
-g_net = get_generator()
-d_net = get_descriptor(CTX)
+g_net = netG
+d_net = netD
 
 # define loss function
 loss = gluon.loss.SigmoidBinaryCrossEntropyLoss()

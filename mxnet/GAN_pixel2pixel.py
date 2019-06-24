@@ -1,11 +1,9 @@
 '''
-训练一个GAN，实现输入卫星图片，输出地图
+训练一个GAN，实现输入卫星图片，输出地图。 或者反之(reversed=True)
 
 对于NetG，输入卫星图片，输出地图
 对于NetD，输入卫星图片+地图在通道维度的叠加，输出真伪判断。
 对于NetD，标注的真数据是一组卫星图片和对应的地图， NetG生成的是伪数据
-
-1000个训练样本，100次迭代下来效果不明显啊。
 '''
 import os
 import matplotlib as mpl
@@ -30,7 +28,7 @@ import random
 
 #######################################################################
 # arguments:
-epochs = 200
+epochs = 11
 batch_size = 10
 
 use_gpu = True
@@ -40,7 +38,7 @@ lr = 0.0002
 beta1 = 0.5
 lambda1 = 100
 pool_size = 50
-
+reversed = True
 #######################################################################
 # define dataset
 dataset = 'maps'
@@ -108,8 +106,8 @@ class MyFileDataset(mx.gluon.data.Dataset):
     def __len__(self):
         return len(self.filelist)
 
-train_data = gluon.data.DataLoader(MyFileDataset(train_img_path,True), batch_size=batch_size, shuffle=False, last_batch='discard')
-val_data = gluon.data.DataLoader(MyFileDataset(val_img_path,True), batch_size=batch_size, shuffle=False, last_batch='discard')
+train_data = gluon.data.DataLoader(MyFileDataset(train_img_path,reversed), batch_size=batch_size, shuffle=False, last_batch='discard')
+val_data = gluon.data.DataLoader(MyFileDataset(val_img_path,reversed), batch_size=batch_size, shuffle=False, last_batch='discard')
 
 def visualize(img_arr):
     plt.imshow(((img_arr.asnumpy().transpose(1, 2, 0) + 1.0) * 127.5).astype(np.uint8))
@@ -426,6 +424,12 @@ def train():
             ###########################
             with autograd.record():
                 fake_out = netG(real_in)
+                '''if (i == 0):
+                    plt.subplot(2, 1, 1)
+                    visualize(real_in[0])
+                    plt.subplot(2, 1, 2)
+                    visualize(fake_out[0])
+                    plt.show()'''
                 fake_concat = nd.concat(real_in, fake_out, dim=1)
                 output = netD(fake_concat)
                 real_label = nd.ones(output.shape, ctx=ctx)
@@ -456,8 +460,8 @@ def train():
         plt.show()
         '''
         if epoch == 0:
-            save_image(real_in, epoch, img_wd, batch_size, "./data")
-        elif epoch % 10 == 0:
+            save_image(real_out, epoch, img_wd, batch_size, "./data")
+        else:
             save_image(fake_out, epoch, img_wd, batch_size, "./data")
         if epoch % 10 == 0 and epoch > 0:
             dump_param(epoch)

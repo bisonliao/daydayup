@@ -347,20 +347,21 @@ class ImagePool():
 
 #######################################################################
 #train network
-def save_image(data, epoch, image_size, batch_size, output_dir, padding=2):
+def save_image(data, epoch, image_size, output_dir, padding=2):
     """ save image """
+    img_num = data.shape[0]
     data = data.asnumpy().transpose((0, 2, 3, 1))
     datanp = np.clip(
         (data - np.min(data))*(255.0/(np.max(data) - np.min(data))), 0, 255).astype(np.uint8)
-    x_dim = min(8, batch_size)
-    y_dim = int(math.ceil(float(batch_size) / x_dim))
+    x_dim = 10
+    y_dim = int(math.ceil(float(img_num) / x_dim))
     height, width = int(image_size + padding), int(image_size + padding)
     grid = np.zeros((height * y_dim + 1 + padding // 2, width *
                      x_dim + 1 + padding // 2, 3), dtype=np.uint8)
     k = 0
     for y in range(y_dim):
         for x in range(x_dim):
-            if k >= batch_size:
+            if k >= img_num:
                 break
             start_y = y * height + 1 + padding // 2
             end_y = start_y + height - padding
@@ -442,7 +443,7 @@ def train():
             if iter % 10 == 0:
                 name, acc = metric.get()
                 logging.info(
-                    'discriminator loss = %f, generator loss = %f, binary training acc = %f at iter %d epoch %d, %.2f samples/s'
+                    'D loss = %f, G loss = %f, D acc = %f at iter %d epoch %d, %.2f samples/s'
                     % (nd.mean(errD).asscalar(), nd.mean(errG).asscalar(), acc, iter, epoch,batch_size / (time.time() - btic)))
             iter = iter + 1
             btic = time.time()
@@ -450,7 +451,7 @@ def train():
 
         name, acc = metric.get()
         metric.reset()
-        logging.info('\nbinary training acc at epoch %d: %s=%f, time:%f '% (epoch, name, acc, time.time() - tic))
+        logging.info('\nD acc at epoch %d: %s=%f, time:%f '% (epoch, name, acc, time.time() - tic))
 
 
         # Visualize one generated image for each epoch
@@ -460,9 +461,9 @@ def train():
         plt.show()
         '''
         if epoch == 0:
-            save_image(real_out, epoch, img_wd, batch_size, "./data")
+            save_image(nd.concat(real_in,real_out, dim=0), epoch, img_wd, "./data")
         else:
-            save_image(fake_out, epoch, img_wd, batch_size, "./data")
+            save_image(nd.concat(real_in,fake_out,dim=0), epoch, img_wd,  "./data")
         if epoch % 10 == 0 and epoch > 0:
             dump_param(epoch)
 

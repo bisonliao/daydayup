@@ -1,9 +1,11 @@
 '''
-使用GAN，输入卫星图片，输出地图
+训练一个GAN，实现输入卫星图片，输出地图
 
 对于NetG，输入卫星图片，输出地图
 对于NetD，输入卫星图片+地图在通道维度的叠加，输出真伪判断。
 对于NetD，标注的真数据是一组卫星图片和对应的地图， NetG生成的是伪数据
+
+1000个训练样本，100次迭代下来效果不明显啊。
 '''
 import os
 import matplotlib as mpl
@@ -23,10 +25,12 @@ from mxnet import autograd
 import numpy as np
 import math
 import imageio
+import re
+import random
 
 #######################################################################
 # arguments:
-epochs = 100
+epochs = 200
 batch_size = 10
 
 use_gpu = True
@@ -84,7 +88,7 @@ class MyFileDataset(mx.gluon.data.Dataset):
                     continue
                 img = os.path.join(path, fname)
                 self.filelist.append(img)
-
+        random.shuffle(self.filelist)
         return
 
     def __getitem__(self, item):
@@ -262,13 +266,52 @@ def set_network():
     trainerG = gluon.Trainer(netG.collect_params(), 'adam', {'learning_rate': lr, 'beta1': beta1})
     trainerD = gluon.Trainer(netD.collect_params(), 'adam', {'learning_rate': lr, 'beta1': beta1})
 
+    with open("./data/netG.proto", "w") as f:
+        print(netG, file=f)
+    with open("./data/netD.proto", "w") as f:
+        print(netD, file=f)
+
     return netG, netD, trainerG, trainerD
+
+# dump param periodly，for break and continue
+def dump_param(ep):
+    filename = "./data/CGAN_netG_%d.param" % (ep)
+    netG.save_parameters(filename)
+    filename = "./data/CGAN_netD_%d.param" % (ep)
+    netD.save_parameters(filename)
+
+# load param from file if there is pretrained param files，for break and continue
+def load_param(path):
+    for path, _, fnames in os.walk(path):
+        maxG = 0
+        maxD = 0
+        for fname in fnames:
+            index_list = re.findall("CGAN_netG_\d+.param", fname)
+            index_list2 = re.findall("\d+", fname)
+            if len(index_list) > 0 and int(index_list2[0]) > maxG:
+                maxG = int(index_list2[0])
+
+            index_list = re.findall("CGAN_netD_\d+.param", fname)
+            index_list2 = re.findall("\d+", fname)
+            if len(index_list) > 0 and int(index_list2[0]) > maxD:
+                maxD = int(index_list2[0])
+    if (maxG > 0 and maxD > 0):
+        filename = "./data/CGAN_netG_%d.param" % (maxG)
+        print("load net params from ", filename)
+        netG.load_parameters(filename, ctx=ctx)
+        filename = "./data/CGAN_netD_%d.param" % (maxD)
+        netD.load_parameters(filename, ctx=ctx)
+        print("load net params from ", filename)
+        return maxD+1
+    else:
+        return 0
 
 # Loss
 GAN_loss = gluon.loss.SigmoidBinaryCrossEntropyLoss()
 L1_loss = gluon.loss.L1Loss()
 
 netG, netD, trainerG, trainerD = set_network()
+start_epoch = load_param("./data/") # if there are saved param files, load params from file
 #######################################################################
 # We use history image pool to help discriminator memorize history errors
 # instead of just comparing current real input and fake output.
@@ -341,7 +384,7 @@ def train():
     stamp = datetime.now().strftime('%Y_%m_%d-%H_%M')
     logging.basicConfig(level=logging.DEBUG)
 
-    for epoch in range(epochs):
+    for epoch in range(start_epoch, epochs):
         tic = time.time()   # begin time of epoch
         btic = time.time() # begin time of iterator
 
@@ -394,19 +437,17 @@ def train():
             # Print log infomation every ten batches
             if iter % 10 == 0:
                 name, acc = metric.get()
-                logging.info('speed: {} samples/s'.format(batch_size / (time.time() - btic)))
                 logging.info(
-                    'discriminator loss = %f, generator loss = %f, binary training acc = %f at iter %d epoch %d'
-                    % (nd.mean(errD).asscalar(),
-                       nd.mean(errG).asscalar(), acc, iter, epoch))
+                    'discriminator loss = %f, generator loss = %f, binary training acc = %f at iter %d epoch %d, %.2f samples/s'
+                    % (nd.mean(errD).asscalar(), nd.mean(errG).asscalar(), acc, iter, epoch,batch_size / (time.time() - btic)))
             iter = iter + 1
             btic = time.time()
 
 
         name, acc = metric.get()
         metric.reset()
-        logging.info('\nbinary training acc at epoch %d: %s=%f' % (epoch, name, acc))
-        logging.info('time: %f' % (time.time() - tic))
+        logging.info('\nbinary training acc at epoch %d: %s=%f, time:%f '% (epoch, name, acc, time.time() - tic))
+
 
         # Visualize one generated image for each epoch
         '''
@@ -416,10 +457,11 @@ def train():
         '''
         if epoch == 0:
             save_image(real_in, epoch, img_wd, batch_size, "./data")
-        else:
+        elif epoch % 10 == 0:
             save_image(fake_out, epoch, img_wd, batch_size, "./data")
+        if epoch % 10 == 0 and epoch > 0:
+            dump_param(epoch)
 
 
 train()
-netG.save_parameters("./data/CGAN_netG.param")
-netD.save_parameters("./data/CGAN_netD.param")
+

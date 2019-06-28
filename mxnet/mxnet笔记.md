@@ -408,6 +408,80 @@ ResNetV1(
 resnet18.features[4][0].body[2]
 ```
 
+### 存储和恢复网络
+
+相比caffe，mxnet的API比较乱，拼拼凑凑的。我了解到可以有好几种方式：
+
+1. 使用python语言的pickle包dump和load。网络架构和参数一锅烩在输出文件里了。
+2. 如果网络和网络中的层都是继承自gluon.HybridBlock，那么调用网络的成员函数export和load_checkpoint，输出json文件描述网络架构、param文件描述的是网络参数。这种方法的代码挺啰嗦的，不优雅，适用范围也比较局限，但输出的文件是比较标准的，例如mathematica可以加载。mathematica使用的底层就是mxnet
+3. 使用网络的save_parameters()和load_parameters()成员函数保存和加载参数，但不能保存网络架构
+4. 使用print(net, file)的方式打印出来的文件还挺可读的，看是不是自己写一个load反向生成网络架构
+
+```python
+symbol_file = os.path.join(ROOT_DIR, self.config.cp_dir, 'triplet-net')
+self.model.export(path=symbol_file, epoch=epoch)  # gluon的export
+
+prefix = os.path.join(ROOT_DIR, self.config.cp_dir, "triplet-net")  # export导出的前缀
+sym, arg_params, aux_params = mx.model.load_checkpoint(prefix=prefix, epoch=5)
+net = gluon.nn.SymbolBlock(outputs=sym, inputs=mx.sym.var('data'))  # 加载网络结构
+# 设置网络参数
+net_params = net.collect_params()
+for param in arg_params:
+    if param in net_params:
+        net_params[param]._load_init(arg_params[param], ctx=ctx)
+for param in aux_params:
+    if param in net_params:
+        net_params[param]._load_init(aux_params[param], ctx=ctx)
+```
+
+### model zoo
+
+gluon提供了很多预训练好的模型，包括alexnet、vgg、ssd等等。主要集中在cv和nlp方面：
+
+```
+https://gluon-cv.mxnet.io/model_zoo/index.html
+https://gluon-nlp.mxnet.io/model_zoo/index.html
+```
+
+gluon会下载训练好的.param参数文件，默认保存的地址是~/.mxnet/models（windows下就是C:\Users\\\<username\>\\.mxnet\models）。
+
+如果手动下载了该模型参数文件，可以放到这个目录下直接使用。
+
+~/.mxnet目录是gluon的数据缓存目录，例如下载的mnist等知名数据集会保存在这个目录的datasets子目录下。
+
+也可以基于已经训练好的模型和自己的数据做进一步的fine tuning。详细见上述文档中的HINT说明部分。
+
+
+
+### 知名数据集的访问
+
+对于一些知名数据集，都有对应的类可以直接使用，例如：
+
+```
+class gluoncv.data.ImageNet(root='~/.mxnet/datasets/imagenet', train=True, transform=None)
+
+class mx.gluon.data.vision.MNIST()
+class mx.gluon.data.vision.FashionMNIST()
+class mx.gluon.data.vision.CIFAR10()
+class mx.gluon.data.vision.CIFAR100()
+```
+
+更多知名数据集的访问类可以见：
+
+```
+https://gluon-cv.mxnet.io/api/data.datasets.html#id1
+https://mxnet.incubator.apache.org/api/python/gluon/data.html
+# mxnet 文档和接口挺乱的，上面就列了两个url，做同类事情
+```
+
+知名数据集下载下来默认保存在~/.mxnet/datasets目录下。
+
+对于自定义的数据集，可以自己实现相关的类，也可以用mxnet提供的：
+
+```
+class mxnet.gluon.data.vision.datasets.ImageFolderDataset
+```
+
 
 
 ### 坑

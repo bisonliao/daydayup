@@ -443,13 +443,17 @@ https://gluon-cv.mxnet.io/model_zoo/index.html
 https://gluon-nlp.mxnet.io/model_zoo/index.html
 ```
 
-gluon会下载训练好的.param参数文件，默认保存的地址是~/.mxnet/models（windows下就是C:\Users\\\<username\>\\.mxnet\models）。
+gluon会下载训练好的.param参数文件，直接使用训练好的模型，也可以基于已经训练好的模型和自己的数据做进一步的fine tuning。详细见上述文档中的HINT说明部分。
+
+
+
+参数文件的默认保存的地址是~/.mxnet/models（windows下就是C:\Users\\\<username\>\\.mxnet\models）。
 
 如果手动下载了该模型参数文件，可以放到这个目录下直接使用。
 
 ~/.mxnet目录是gluon的数据缓存目录，例如下载的mnist等知名数据集会保存在这个目录的datasets子目录下。
 
-也可以基于已经训练好的模型和自己的数据做进一步的fine tuning。详细见上述文档中的HINT说明部分。
+如果是使用mxnet的API，那么缓存目录可能是C:\\Users\\\<username\>\\AppData\\Roaming\\mxnet\\，有点混乱！
 
 
 

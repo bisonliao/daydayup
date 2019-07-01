@@ -1,4 +1,4 @@
-### 多批次的梯度累加
+### 1、多批次的梯度累加
 
 mxnet gluon不需要像pytorch caffe那样手动清零梯度，因为新梯度默认是写进去，而不是累加。
 
@@ -28,7 +28,11 @@ print(namedLayer.bias.grad(ctx=ctx)[0])
 
 默认情况下不需要手动清理梯度，但mxnet的网络的参数需要手动调用initialize()函数来初始化，或者load_parameters()从参数文件中加载。
 
-### 自动求解梯度与自定义的backward
+### 2、自动求解梯度
+
+自动求解梯度比较重要，所以基本上是李沐的教程中那一章的全部记录。
+
+#### 2.1 基本理解
 
 with autograd.record()会跟踪代码块范围内NDArray的相关操作，每个操作都有对应的反向传播函数，例如下面的代码
 
@@ -100,10 +104,187 @@ yy = nd.mean(x) + 2 * x
 print(yy - y)
 
 # 但这样又怎么解释呢？
+x = nd.array([[1,2,3],[3,2,1]])
 x = x + nd.array([[0.00001, 0, 0],[0,0,0]])
 yy = nd.mean(x) + 2 * x
 print(yy - y)
 ```
+
+后来理解了：
+
+反向传播都是从一个标量开始求导，如果正向传播最后得出的是一个向量或者矩阵，那么mxnet会先把这里面的元素都加起来得到标量，再开始反向传播。
+
+有了这个规则，上面的梯度为3而不是2+1/6 就好解释了：
+
+```python
+  y= [ [x1*2 + (x1+x2+...+x6)/6,  x2*2 + (x1+x2+...+x6)/6 , x3*2 + (x1+x2+...+x6)/6 ],
+	   [x1*2 + (x1+x2+...+x6)/6,  x2*2 + (x1+x2+...+x6)/6 , x3*2 + (x1+x2+...+x6)/6 ] ]
+  #backward的时候，先把y的个元素加起来，得到标量，再对X的个元素求偏导：
+  loss=x1*2 + x2*2 +...+ x6*2 + 6*( (x1+x2+...+x6)/6 )
+  loss=x1*3 + x2*3 +...+ x6*3
+```
+
+引自李沐的文档：
+
+```
+So MXNet will sum the elements in y to get the new variable by default, and then find the analytical gradient of the variable with respect to x evaluated at its current value y/dx 
+```
+
+#### 2.2 detach和attach_grad的运用
+
+如果一个变量（通常是NDArray类型的变量）执行detach()，就会返回一个“常量”NDArray，常量失去了mxnet记忆的compute graph，mxnet不记得该常量从何而来，链式求导过程遇到该常量就会结束，不再继续传递，但该常量本身是会有梯度的。
+
+下面的代码，u相当于一个常量作用在x上，所以z对x的导数就等于u的值：
+
+```python
+x = nd.array([[1,2,3],[3,2,1]])
+x.attach_grad()
+with autograd.record():
+	y = x * x
+	u = y.detach()
+	z = u * x
+z.backward()
+print(x.grad) #输出u的值，也就是y的值
+y.backward()
+print(x.grad) #输出2X
+```
+
+输出如下：
+
+```
+[[1. 4. 9.]
+ [9. 4. 1.]]
+<NDArray 2x3 @cpu(0)>
+
+[[2. 4. 6.]
+ [6. 4. 2.]]
+<NDArray 2x3 @cpu(0)>
+```
+
+对一个变量x执行attach_grad()，相当于调用了x=x.detach()，当然不只是做了detach，还有分配梯度内存等操作。链式求导到该变量截止，该变量相当于一个常量。例如下面代码，x和u的梯度都是1，y的梯度则为0：
+
+```python
+x=nd.ones(4)
+y = nd.ones(4) * 2
+x.attach_grad() #这里不能写成x=x.detach(),因为attach_grad() more than detach()
+y.attach_grad()
+with autograd.record():
+    u = x * y
+    u.attach_grad() # implicitly run u = u.detach()， 何必写成这个死样子呢？
+    z = u + x
+z.backward()
+print(x.grad, u.grad, y.grad)
+```
+
+输出为：
+
+```
+[1. 1. 1. 1.]
+<NDArray 4 @cpu(0)> 
+[1. 1. 1. 1.]
+<NDArray 4 @cpu(0)> 
+[0. 0. 0. 0.]
+<NDArray 4 @cpu(0)>
+```
+
+下面这段代码有点意思，z是y的函数，y是x的函数。为了逐层计算梯度（链式法则），y必须截留梯度信息：
+
+```python
+x=nd.ones(4)
+x.attach_grad()
+with autograd.record():
+    y = 2*x
+    y.backward() #计算y 对x 的梯度
+    # y想截留前面z对自己的梯度
+    y.attach_grad() # y：我想分配内存保存前面z对我的梯度，并且这个梯度不再向后传播了，因为隐含的调用了y=y.detach()
+    z = y * y
+	z.backward() # 计算z对y的梯度
+print(x.grad,y.grad)
+```
+
+输出是：
+
+```
+[2. 2. 2. 2.]
+<NDArray 4 @cpu(0)> 
+[4. 4. 4. 4.]
+<NDArray 4 @cpu(0)>
+```
+
+而这样写代码是得不到z对y的梯度的，y.grad为None：
+
+```python
+x=nd.ones(4)
+x.attach_grad()
+with autograd.record():
+    y = 2*x
+    z = y * y
+z.backward()
+print(x.grad,y.grad)
+```
+
+#### 2.3 头梯的运用
+
+还是上面的例子，z是y的函数，y是x的函数
+
+```pyton
+x=nd.ones(4)
+x.attach_grad()
+with autograd.record():
+    y = 2*x
+    yy = y.detach() #yy用于截胡z对y的梯度
+    yy.attach_grad()
+    z=yy*yy
+z.backward()
+print(x.grad,yy.grad) #x的梯度为0，因为被yy截胡了
+y.backward(yy.grad)# 计算z对x的梯度：利用z对y的梯度作为头梯系数乘一下y对x的梯度即可
+print(x.grad)
+```
+
+输出为：
+
+```
+[0. 0. 0. 0.]
+<NDArray 4 @cpu(0)> 
+[4. 4. 4. 4.]
+<NDArray 4 @cpu(0)>
+[8. 8. 8. 8.]
+<NDArray 4 @cpu(0)>
+```
+
+#### 2.4 python本身流程控制语句的计算图的追踪
+
+即使前向传递过程中包含有if for等python流程控制语句，mxnet也能够追踪计算图和梯度关系，这个跟MaxPool里用位图记录前向传递使用了哪个值类似，autograd应该是有辅助变量来记录相关信息的。
+
+```python
+def f(a):
+    b = a * 2
+    while b.norm().asscalar() < 1000:
+        b = b * 2
+    if b.sum().asscalar() > 0:
+        c = b
+    else:
+        c = 100 * b
+    return c
+
+x=nd.ones(4)
+x.attach_grad()
+with autograd.record():
+    y = f(x)
+y.backward()
+print(x.grad)
+```
+
+输出：
+
+```
+[512. 512. 512. 512.]
+<NDArray 4 @cpu(0)>
+```
+
+
+
+### 3、自定义的backward
 
 大多数时候，我们前向传播用NDArray已经定义好的函数和运算符来完成，不需要我们关注和实现反向传播，mxnet自动帮我们搞定。主要在以下场景需要注意尽量用NDArray成员函数：
 
@@ -179,7 +360,7 @@ class MyLayer(block.Block):
 
 
 
-### 学习率、学习率倍数等超参数
+### 4、学习率、学习率倍数等超参数
 
 可以这样来修改某参数的学习率倍数，默认是1.0：
 
@@ -218,7 +399,7 @@ trainer.set_learning_rate(lr)
 https://mxnet.incubator.apache.org/api/python/index.html
 ```
 
-### 自定义的数据读取方式
+### 5、自定义的数据读取方式
 
 假设训练数据是来自我们自己形态比较特殊的数据源，例如log文件。那怎么做呢？
 
@@ -266,7 +447,7 @@ https://mxnet.incubator.apache.org/versions/master/tutorials/gluon/datasets.html
 
 
 
-### 自定义layer
+### 6、自定义layer
 
 gluon.Block是mxnet里非常重要的类，重要性与NDArray不相上下。
 
@@ -276,7 +457,7 @@ gluon.Block是mxnet里非常重要的类，重要性与NDArray不相上下。
 https://gluon.mxnet.io/chapter03_deep-neural-networks/custom-layer.html#Defining-a-(toy)-custom-layer
 ```
 
-### Train mode and predict mode
+### 7、Train mode and predict mode
 
 数据在net中前向传播的时候，有两种模式，train mode和predict模式，mxnet默认是predict模式。例如这段代码就是predict模式，打印显示false：
 
@@ -338,7 +519,7 @@ if (this->phase_ == TRAIN) {
   }
 ```
 
-### 获取中间层的输出
+### 8、获取中间层的输出
 
 我们有时候需要获得中间层的输出，例如查看卷积网络的feature map。mxnet下怎么做呢？
 
@@ -408,7 +589,7 @@ ResNetV1(
 resnet18.features[4][0].body[2]
 ```
 
-### 存储和恢复网络
+### 9、存储和恢复网络
 
 相比caffe，mxnet的API比较乱，拼拼凑凑的。我了解到可以有好几种方式：
 
@@ -434,7 +615,7 @@ for param in aux_params:
         net_params[param]._load_init(aux_params[param], ctx=ctx)
 ```
 
-### model zoo
+### 10、model zoo
 
 gluon提供了很多预训练好的模型，包括alexnet、vgg、ssd等等。主要集中在cv和nlp方面：
 
@@ -457,7 +638,7 @@ gluon会下载训练好的.param参数文件，直接使用训练好的模型，
 
 
 
-### 知名数据集的访问
+### 11、知名数据集的访问
 
 对于一些知名数据集，都有对应的类可以直接使用，例如：
 

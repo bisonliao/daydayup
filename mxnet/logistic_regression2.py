@@ -69,10 +69,20 @@ net = gluon.nn.Dense(1,activation="sigmoid")
 net.initialize(ctx=ctx)
 trainer = gluon.Trainer(net.collect_params(), "sgd")
 trainer.set_learning_rate(lr)
+
+# according to standard loss function such as SoftmaxCrossEntropyLoss/L2Loss
+# loss value shape should be (batch_size, )
 def my_softmax_loss(output, y):
-    loss_value = -nd.nansum(  y * nd.log(output) + (1-y) * nd.log(1-output)   ) / output.shape[0]
-    #loss_value = y * nd.log(output) + (1 - y) * nd.log(1 - output)
-    return  loss_value
+    # two implements, I think sencond one is more standard.
+    if False:
+        # returning a NDArray with shape(1,) is ok
+        loss_value = -nd.nansum(  y * nd.log(output) + (1-y) * nd.log(1-output)   ) / output.shape[0]
+        return loss_value
+    else:
+        # returning a NDArray with shape(batch_size,)
+        y = y.reshape(-1,1)
+        loss_value = -( y * nd.log(output) + (1-y) * nd.log(1-output)  )
+        return  loss_value.reshape(-1,)
 
 
 

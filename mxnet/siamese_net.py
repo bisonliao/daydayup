@@ -128,7 +128,8 @@ net.initialize(mx.init.Xavier(magnitude=2.24),ctx=context)
 trainer = gluon.Trainer(net.collect_params(), "sgd", {"wd":0.00})
 trainer.set_learning_rate(lr)
 
-
+# according to standard loss function such as SoftmaxCrossEntropyLoss/L2Loss
+# loss value shape should be (batch_size, )
 def my_softmax_loss(l_o, r_o, y):
     margin = 1.0
     d = nd.norm(l_o - r_o, axis=1) #

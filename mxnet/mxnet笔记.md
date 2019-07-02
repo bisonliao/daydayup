@@ -457,6 +457,36 @@ gluon.Block是mxnet里非常重要的类，重要性与NDArray不相上下。
 https://gluon.mxnet.io/chapter03_deep-neural-networks/custom-layer.html#Defining-a-(toy)-custom-layer
 ```
 
+Block类非常重要的属性有：
+
+1. params：类型为mxnet.gluon.parameter.ParameterDict，用于保存该block自身的参数，不保存子块的参数。这里面的参数在save_parameters/load_parameters的时候会被保存和装载。它主要有两个方法：
+   1. get_constant()，创建/获取一个"常量"NDArray，该参数在训练过程中不需要梯度更新的
+   2. get()，创建 /或者类似w b这样的NDArray参数，该参数在训练过程中不需要梯度更新的
+2. _children：类型为OrderedDict，用于保存该Block的子块。\_children字典里保存的子块，会在该Block的initialize/load_parameters/save_parameters/\_\_call\_\_/collect_params等操作中自动照顾到。几种情况的变量会进入到该字典：
+   1. self.xxx这样的Block属性，例如self.fc0=Dense(256)也会自动进入\_children字典。
+   2. register_child()注册的变量，会进入\_children字典。
+   3. Block的子类nn.Sequential的add()成员函数增加的Block，例如net.add(Dense(256))，该变量自动进入\_children字典。
+
+示例代码：
+
+```python
+class MLP(nn.Block):
+    def __init__(self, **kwargs):
+        super(MLP, self).__init__(**kwargs)
+
+        self.weight = self.params.get('weight', 
+                                      init=mxnet.init.Xavier(magnitude=2.24),
+                                      shape=(10, 15))
+        self.c = self.params.get_constant( 'cons_time', 
+                                           nd.random.uniform(shape=(20, 20)))
+		print([(k, self.params[k]) for k in self.params.keys()])
+        self.fc0 = nn.Dense(256)
+        print([(k,self._children[k] ) for k in self._children.keys()])
+mlp = MLP()
+print(dir(mxnet.gluon.parameter)) #可以查看该module下有哪些类
+help(mxnet.gluon.parameter.ParameterDict)#可以打印该类的文档信息
+```
+
 ### 7、Train mode and predict mode
 
 数据在net中前向传播的时候，有两种模式，train mode和predict模式，mxnet默认是predict模式。例如这段代码就是predict模式，打印显示false：

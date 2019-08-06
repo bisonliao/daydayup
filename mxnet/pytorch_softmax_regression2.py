@@ -24,6 +24,7 @@ set1 = tv.datasets.MNIST("./data", False, download=True, transform=transform)
 test_data = dataloader.DataLoader(set1, batchsz, True)# type:dataloader.DataLoader
 
 def test(model, test_data):
+    model.eval()
     s = nn.Softmax(dim=1)
     for images, labels in test_data:
         images = images.reshape(batchsz, -1).to(device="cuda:0")
@@ -49,6 +50,7 @@ lossfun = nn.CrossEntropyLoss()
 
 if compute:
     for e in range(epoches):
+        model.train()
         for images, labels in train_data:
             images = images.reshape(batchsz, -1).to(device="cuda:0")# type:torch.tensor()
             images = images - 0.5

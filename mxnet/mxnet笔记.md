@@ -707,10 +707,11 @@ mxnet的gluon接口与pytorch的编程接口非常类似，我怀疑mxnet在设�
 | ----------------------- | --------------- |
 | mxnet.gluon.NDArray     | torch.tensor    |
 | mxnet.gluon.HybridBlock | torch.nn.Module |
-| mxnet.gluon.nn          | torch.nn        |
+| mxnet.gluon.nn/rnn      | torch.nn/rnn    |
 | Dataset/DataLoader      | Dataset/DataLoader|
 | gluon.Trainer | torch.optim.SGD |
 | gluon.loss.SoftmaxCrossEntropyLoss | nn.CrossEntropyLoss |
+| nn.Sequential() | nn.Sequential() |
 
 下面是一个一段简单的softmax regression的pytorch代码：
 

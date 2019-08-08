@@ -12,11 +12,12 @@ import h5py
 import torch.utils.data.dataset as dataset
 import torch.utils.data.dataloader as dataloader
 import torch.nn as nn
+import matplotlib.pyplot as plt
 
 epoches = 500
 batchsz = 10
-lr = 0.01
-compute = True
+lr = 0.0001
+compute = False
 minbatch = 0  # min batch id
 cropsz = 200
 
@@ -56,6 +57,53 @@ def test(model, test_data):
             if (cnt >= 100):
                 break
     return same / batchsz /(cropsz*cropsz)/cnt
+def eval(model, eval_data, e):
+    with torch.no_grad(): # 节约内存考虑，关闭梯度
+        for images, _ in eval_data:
+            images = images.to(device="cuda:0")/255
+            yy = model(images)
+            yy = yy['out'].to("cpu")
+            # shape: batchsz, 21, 40000
+            yy = yy.reshape(yy.shape[0], yy.shape[1], -1)  # type:torch.Tensor
+            print("1", yy.shape)
+            fig = plt.figure()
+            for i in range(batchsz):
+                pic = images[i].to("cpu")#type:torch.Tensor
+                pic = (pic * 255 + 128) /255
+                #pic = pic.to(dtype=torch.uint8)
+                pic = pic.reshape((3, -1))
+                pic = pic.transpose(1,0)
+                pic = pic.reshape((cropsz, cropsz, 3))
+                plt.subplot(2, batchsz, i+1)
+                plt.imshow(pic)
+                plt.imsave("./data/input.png", pic)
+
+
+                y = yy[i]  # shape:21, 40000
+                print("2", y.shape)
+                y = y.transpose(1,0)
+                y = y.argmax(1)
+                print("max:", y.max(0))
+                y = y * 255
+                pic = torch.zeros((3, cropsz*cropsz), dtype=torch.uint8)
+
+                pic[0] = y
+                pic[1] = y
+                pic[2] = y
+                #pic = pic.to(dtype=torch.uint8)
+                pic = pic.transpose(1, 0)
+                pic = pic.reshape((cropsz, cropsz, 3))
+                plt.subplot(2, batchsz, i+batchsz+1)
+                plt.imshow(pic)
+                plt.imsave("./data/output.png", pic)
+                break
+            filename="./data/eval_%d.png"%(e)
+            fig.savefig(filename)
+            break
+
+
+
+
 
 class myDataset(dataset.Dataset):
     def __init__(self, isTrain=True):
@@ -81,10 +129,11 @@ class myDataset(dataset.Dataset):
 
 
     def __len__(self):
-        if self.isTrain:
+        return 100
+        '''if self.isTrain:
             return self.sampleNumInFile * 50
         else:
-            return self.sampleNumInFile * 4
+            return self.sampleNumInFile * 4'''
 
 
 set1 = myDataset()
@@ -93,14 +142,16 @@ train_data = dataloader.DataLoader(set1, batchsz, False)# type:dataloader.DataLo
 set1 = myDataset(False)
 test_data = dataloader.DataLoader(set1, batchsz, False)# type:dataloader.DataLoader
 
-model = get_net()
-print(model)
-load(model, 100)
-#trainer = torch.optim.SGD(model.parameters(), lr,momentum=0.9, weight_decay=0.001)
-trainer = torch.optim.Adam(model.parameters(), lr)
-lossfun = nn.CrossEntropyLoss()
+
 
 if compute:
+    model = get_net()
+    # print(model)
+    load(model, 1100)
+    # trainer = torch.optim.SGD(model.parameters(), lr,momentum=0.9, weight_decay=0.001)
+    trainer = torch.optim.Adam(model.parameters(), lr)
+    lossfun = nn.CrossEntropyLoss()
+
     lossSum = 0
     for e in range(epoches):
         model.train()
@@ -120,20 +171,21 @@ if compute:
 
             lossSum= lossSum + L.to("cpu").data.numpy()
             if minbatch % 10 == 0:
-                print(minbatch, ":", lossSum / 10)
+                print(e, " ",minbatch, " ", lossSum / 10)
                 lossSum = 0
             '''if minbatch % 50 == 0:
                 for p in trainer.param_groups:
                     p['lr'] *= 0.5'''
             if minbatch % 100 == 0:
                 save(model, minbatch)
-                print("test acc:"'', test(model, test_data))
+                print(e, ":test acc:"'', test(model, test_data))
                 model.train()
 
 
 else:
     model = get_net()
-    load(model, 10)
+    load(model, 1100)
+    eval(model, train_data, 1)
 
 
 

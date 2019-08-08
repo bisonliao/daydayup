@@ -15,9 +15,9 @@ import torch.nn as nn
 
 epoches = 500
 batchsz = 10
-lr = 0.005
+lr = 0.1
 compute = True
-
+minbatch = 0  # min batch id
 cropsz = 200
 
 def save(model, e):
@@ -27,6 +27,8 @@ def save(model, e):
 def load(model, e):
     file = './data/pytorch_fcn_%d.pk' % (e)
     model.load_state_dict(torch.load(file))
+    global  minbatch
+    minbatch = e + 1
 
 def get_net():
     model = torch.hub.load('pytorch/vision', 'fcn_resnet101', pretrained=False, force_reload=False)
@@ -85,16 +87,16 @@ test_data = dataloader.DataLoader(set1, batchsz, False)# type:dataloader.DataLoa
 
 model = get_net()
 print(model)
-#load(model, 10)
+load(model, 200)
 trainer = torch.optim.SGD(model.parameters(), lr)
 lossfun = nn.CrossEntropyLoss()
 
 if compute:
+    lossSum = 0
     for e in range(epoches):
         model.train()
         trainer.zero_grad()
-        minbatch = 0
-        lossSum = 0
+
         for images, labels in train_data:
             minbatch = minbatch + 1
             images = images.to(device="cuda:0")# type:torch.tensor()
@@ -104,15 +106,15 @@ if compute:
             labels = labels.reshape(batchsz, cropsz, cropsz)
             L = lossfun(y, labels)
             L.backward()
-            lossSum= L.to("cpu").data.numpy()
+            lossSum= lossSum + L.to("cpu").data.numpy()
             if minbatch % 10 == 0:
                 trainer.step()
                 trainer.zero_grad()
-                print(lossSum / 10)
+                print(minbatch, ":", lossSum / 10)
                 lossSum = 0
-
-        save(model, e)
-        print("ep:", e, " test acc:"'', test(model, test_data))
+            if minbatch % 200 == 0:
+                save(model, minbatch)
+                print("test acc:"'', test(model, test_data))
 
 
 else:

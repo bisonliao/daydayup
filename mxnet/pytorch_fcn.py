@@ -15,7 +15,7 @@ import torch.nn as nn
 
 epoches = 500
 batchsz = 10
-lr = 0.1
+lr = 0.01
 compute = True
 minbatch = 0  # min batch id
 cropsz = 200
@@ -37,17 +37,25 @@ def get_net():
 def test(model, test_data):
     model.eval()
     s = nn.Softmax(dim=1)
-    for images, labels in test_data:
-        images = images.to(device="cuda:0")
-        labels = labels.to(device="cuda:0")
-        y = model(images)
-        y = y['out']
-        y = y.reshape(y.shape[0], y.shape[1], -1)
-        y = s(y)
-        y = torch.max(y, 1) # type:torch.return_types.max
-        labels = labels.reshape(labels.shape[0], -1)
-        same = (y[1] == labels).sum()
-        return same.to(device='cpu').numpy() / batchsz /(cropsz*cropsz)
+    cnt = 0
+    same = 0
+
+    with torch.no_grad(): # 节约内存考虑，关闭梯度
+        for images, labels in test_data:
+            images = images.to(device="cuda:0")/255
+            labels = labels.to(device="cuda:0")
+            y = model(images)
+            y = y['out']
+            y = y.reshape(y.shape[0], y.shape[1], -1)
+            y = s(y)
+            y = torch.max(y, 1) # type:torch.return_types.max
+            labels = labels.reshape(labels.shape[0], -1)
+            same = same + (y[1] == labels).sum().to(device='cpu').numpy()
+            cnt = cnt + 1
+            #torch.cuda.empty_cache()
+            if (cnt >= 100):
+                break
+    return same / batchsz /(cropsz*cropsz)/cnt
 
 class myDataset(dataset.Dataset):
     def __init__(self, isTrain=True):
@@ -87,8 +95,9 @@ test_data = dataloader.DataLoader(set1, batchsz, False)# type:dataloader.DataLoa
 
 model = get_net()
 print(model)
-load(model, 200)
-trainer = torch.optim.SGD(model.parameters(), lr)
+load(model, 100)
+#trainer = torch.optim.SGD(model.parameters(), lr,momentum=0.9, weight_decay=0.001)
+trainer = torch.optim.Adam(model.parameters(), lr)
 lossfun = nn.CrossEntropyLoss()
 
 if compute:
@@ -99,22 +108,27 @@ if compute:
 
         for images, labels in train_data:
             minbatch = minbatch + 1
-            images = images.to(device="cuda:0")# type:torch.tensor()
+            images = images.to(device="cuda:0")/255# type:torch.tensor()
             labels = labels.to(device="cuda:0")
             y = model(images)
             y = y['out']
             labels = labels.reshape(batchsz, cropsz, cropsz)
             L = lossfun(y, labels)
+            trainer.zero_grad()
             L.backward()
+            trainer.step()
+
             lossSum= lossSum + L.to("cpu").data.numpy()
             if minbatch % 10 == 0:
-                trainer.step()
-                trainer.zero_grad()
                 print(minbatch, ":", lossSum / 10)
                 lossSum = 0
-            if minbatch % 200 == 0:
+            '''if minbatch % 50 == 0:
+                for p in trainer.param_groups:
+                    p['lr'] *= 0.5'''
+            if minbatch % 100 == 0:
                 save(model, minbatch)
                 print("test acc:"'', test(model, test_data))
+                model.train()
 
 
 else:

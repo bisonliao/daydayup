@@ -16,8 +16,8 @@ import matplotlib.pyplot as plt
 
 epoches = 500
 batchsz = 10
-lr = 0.0001
-compute = False
+lr = 0.0001 # 随着训练的深入，逐步调小lr，一开始是0.1
+compute = True
 minbatch = 0  # min batch id
 cropsz = 200
 
@@ -65,38 +65,34 @@ def eval(model, eval_data, e):
             yy = yy['out'].to("cpu")
             # shape: batchsz, 21, 40000
             yy = yy.reshape(yy.shape[0], yy.shape[1], -1)  # type:torch.Tensor
-            print("1", yy.shape)
-            fig = plt.figure()
+            fig = plt.figure(figsize=(50,5)) # width,height
             for i in range(batchsz):
                 pic = images[i].to("cpu")#type:torch.Tensor
                 pic = (pic * 255 + 128) /255
-                #pic = pic.to(dtype=torch.uint8)
                 pic = pic.reshape((3, -1))
                 pic = pic.transpose(1,0)
                 pic = pic.reshape((cropsz, cropsz, 3))
+
                 plt.subplot(2, batchsz, i+1)
                 plt.imshow(pic)
-                plt.imsave("./data/input.png", pic)
+                plt.axis('off')
 
 
                 y = yy[i]  # shape:21, 40000
-                print("2", y.shape)
                 y = y.transpose(1,0)
                 y = y.argmax(1)
-                print("max:", y.max(0))
                 y = y * 255
                 pic = torch.zeros((3, cropsz*cropsz), dtype=torch.uint8)
 
                 pic[0] = y
                 pic[1] = y
                 pic[2] = y
-                #pic = pic.to(dtype=torch.uint8)
                 pic = pic.transpose(1, 0)
                 pic = pic.reshape((cropsz, cropsz, 3))
                 plt.subplot(2, batchsz, i+batchsz+1)
                 plt.imshow(pic)
-                plt.imsave("./data/output.png", pic)
-                break
+                plt.axis('off')
+            #plt.show()
             filename="./data/eval_%d.png"%(e)
             fig.savefig(filename)
             break
@@ -178,14 +174,14 @@ if compute:
                     p['lr'] *= 0.5'''
             if minbatch % 100 == 0:
                 save(model, minbatch)
-                print(e, ":test acc:"'', test(model, test_data))
+                eval(model, train_data, minbatch)
                 model.train()
 
 
 else:
     model = get_net()
     load(model, 1100)
-    eval(model, train_data, 1)
+    eval(model, test_data, 1)
 
 
 

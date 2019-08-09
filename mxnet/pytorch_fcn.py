@@ -35,6 +35,7 @@ def get_net():
     model = torch.hub.load('pytorch/vision', 'fcn_resnet101', pretrained=False, force_reload=False)
     return model.to("cuda:0")
 
+#测试准确率
 def test(model, test_data):
     model.eval()
     s = nn.Softmax(dim=1)
@@ -57,6 +58,8 @@ def test(model, test_data):
             if (cnt >= 100):
                 break
     return same / batchsz /(cropsz*cropsz)/cnt
+
+# 对样本进行处理，保存为可直观感受的图片
 def eval(model, eval_data, e):
     with torch.no_grad(): # 节约内存考虑，关闭梯度
         for images, _ in eval_data:
@@ -92,7 +95,6 @@ def eval(model, eval_data, e):
                 plt.subplot(2, batchsz, i+batchsz+1)
                 plt.imshow(pic)
                 plt.axis('off')
-            #plt.show()
             filename="./data/eval_%d.png"%(e)
             fig.savefig(filename)
             break
@@ -100,7 +102,7 @@ def eval(model, eval_data, e):
 
 
 
-
+# 从HDF5文件中读取样本的dataset
 class myDataset(dataset.Dataset):
     def __init__(self, isTrain=True):
         super()
@@ -125,11 +127,11 @@ class myDataset(dataset.Dataset):
 
 
     def __len__(self):
-        return 100
-        '''if self.isTrain:
+        #return 100 #尝试对有限的几个训练样本，看看模型会不会过拟合的收敛到它们。结果是ok的，说明模型可以收敛。
+        if self.isTrain:
             return self.sampleNumInFile * 50
         else:
-            return self.sampleNumInFile * 4'''
+            return self.sampleNumInFile * 4
 
 
 set1 = myDataset()
@@ -143,7 +145,7 @@ test_data = dataloader.DataLoader(set1, batchsz, False)# type:dataloader.DataLoa
 if compute:
     model = get_net()
     # print(model)
-    load(model, 1100)
+    load(model, 1300)
     # trainer = torch.optim.SGD(model.parameters(), lr,momentum=0.9, weight_decay=0.001)
     trainer = torch.optim.Adam(model.parameters(), lr)
     lossfun = nn.CrossEntropyLoss()
@@ -174,13 +176,13 @@ if compute:
                     p['lr'] *= 0.5'''
             if minbatch % 100 == 0:
                 save(model, minbatch)
-                eval(model, train_data, minbatch)
+                eval(model, test_data, minbatch)
                 model.train()
 
 
 else:
     model = get_net()
-    load(model, 1100)
+    load(model, 1300)
     eval(model, test_data, 1)
 
 

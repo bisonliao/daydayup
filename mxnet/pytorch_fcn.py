@@ -33,6 +33,10 @@ def load(model, e):
 
 def get_net():
     model = torch.hub.load('pytorch/vision', 'fcn_resnet101', pretrained=False, force_reload=False)
+    # modify the last layer to 2 classes
+    model.classifier[4] = nn.Conv2d(512, 2, kernel_size=(1, 1), stride=(1, 1))
+    model.aux_classifier[4] = nn.Conv2d(256, 2, kernel_size=(1, 1), stride=(1, 1))
+    
     return model.to("cuda:0")
 
 #测试准确率
@@ -61,6 +65,7 @@ def test(model, test_data):
 
 # 对样本进行处理，保存为可直观感受的图片
 def eval(model, eval_data, e):
+    model.eval()
     with torch.no_grad(): # 节约内存考虑，关闭梯度
         for images, _ in eval_data:
             images = images.to(device="cuda:0")/255

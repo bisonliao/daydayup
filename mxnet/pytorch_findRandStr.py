@@ -9,6 +9,7 @@ import torch.utils.data.dataset as dataset
 import torch.utils.data.dataloader as dataloader
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.jit
 
 batchsz = 100
 lr = 0.001
@@ -196,7 +197,43 @@ if compute:
                 lossSum = 0
         print(e, " acc:", test(model, test_data))
         model.train()
+    torch.jit.script(model).save("./findRandStr.pt")
 
+// c++ call the trained model:
+#include <torch/script.h> // One-stop header.
+#include <iostream>
+#include <memory>
+
+int main() {
+
+  // Deserialize the ScriptModule from a file using torch::jit::load().
+  torch::jit::script::Module module = torch::jit::load("E:\\DeepLearning\\mxnet\\pyproject\\test1\\findRandStr.pt");
+
+  std::cout << "ok\n";
+ 
+  std::vector<torch::jit::IValue> inputs;
+  c10::Device dev = c10::Device("cuda:0");
+  //inputs.push_back(torch::ones({ 1,40 }).to(dev));
+
+  char domain[] = "prefacesupposing.that.truth             ";
+  torch::Tensor t = torch::zeros({ 2, 40 });
+  for (int i = 0; i < 40; ++i)
+  {
+	  t[0][i] = float(domain[i])/255.0;
+	  t[1][i] = 1.0;
+
+  }
+  std::cout << "t is ready\n";
+  inputs.push_back(t.to(dev));
+  std::cout << " input is ready\n";
+  module.eval();
+
+  // Execute the model and turn its output into a tensor.
+  at::Tensor output = module.forward(inputs).toTensor();
+  std::cout << "forward() done\n";
+  std::cout << output<<"\n";
+
+ }
 
 
 

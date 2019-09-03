@@ -54,8 +54,7 @@ def get_positive():
             substr = substr[:-1]
 
         while len(substr) < inputsz:
-            substr = substr+bytes(" ", encoding='utf8')
-
+	    substr = substr + b'\0'
 
         if offset < 400:
             print(str(substr))
@@ -74,7 +73,8 @@ def get_negtive():
             pos = random.randint(0, len(chars))
             example = example + bytes(chars[pos:pos+1], encoding="utf8")
         while len(example) < inputsz:
-            example = example+bytes(" ", encoding='utf8')
+            example = example+b'\0'
+
         if i < 10:
             print(example)
         t = torch.tensor([int(example[i]) for i in range(inputsz)])

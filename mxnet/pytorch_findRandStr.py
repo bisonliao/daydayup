@@ -150,6 +150,38 @@ class MyModel(nn.Module):
         x = nn.functional.relu(self.fc2(x))
         x = self.fc3(x)
         return x
+# the network according to some TextCNN papaer 
+'''class MyModel(torch.nn.Module):
+    def __init__(self):
+        super(MyModel, self).__init__()
+        self.chnnum = 2
+        self.conv1 = nn.Conv1d(1, self.chnnum, kernel_size=4, padding=0) # 37 X self.chnnum
+        self.conv2 = nn.Conv1d(1, self.chnnum, kernel_size=3, padding=0) # 38 X self.chnnum
+        self.conv3 = nn.Conv1d(1, self.chnnum, kernel_size=2, padding=0) # 39 X self.chnnum
+        self.pool1 = nn.MaxPool1d(inputsz-3)
+        self.pool2 = nn.MaxPool1d(inputsz - 2)
+        self.pool3 = nn.MaxPool1d(inputsz - 1)
+        self.fc = nn.Linear(self.chnnum*3, 2)
+
+
+    def forward(self, x):
+        x = x.reshape(x.shape[0], 1, -1)
+        x1 = nn.functional.relu(self.conv1(x)) # (batchsz, self.chnnum, 37)
+        x2 = nn.functional.relu(self.conv2(x)) # (batchsz, self.chnnum, 38)
+        x3 = nn.functional.relu(self.conv3(x))# (batchsz, self.chnnum, 39)
+
+        x1 = self.pool1(x1)
+        x2 = self.pool1(x2)
+        x3 = self.pool1(x3)
+
+
+        x1 = x1.reshape(x1.shape[0], -1) # (batchsz, self.chnnum)
+        x2 = x2.reshape(x2.shape[0], -1) # (batchsz, self.chnnum)
+        x3 = x3.reshape(x3.shape[0], -1) # (batchsz, self.chnnum)
+        x = torch.cat([x1, x2, x3 ], dim=1) # (batchsz, self.chnnum*3)
+        x = self.fc(x).softmax(1)
+        return x'''
+
 
 # 用测试集对模型进行校验
 def test(model, test_data):

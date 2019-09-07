@@ -13,6 +13,10 @@ fastText既可以获得词向量，也可以对句子进行分类
 这个例子里面，只用fastText的词向量功能和fastText的训练好的词向量模型，下载地址：https://fasttext.cc/docs/en/pretrained-vectors.html
 没有用fastText的分类功能，是我自己用pytorch实现的分类器。
 pip3 install fasttext安装版本有问题（2019.9），还是要从官方的github下的才好。要不然get_nearest_neighbors这么关键的特性都不支持
+
+词向量的使用确实对该分类模型的收敛有明显帮助：
+1、当我错误的把英文词向量用于中文的时候，准确率低近20个百分点，且收敛很慢
+2、每个单词使用该单词的32B大小的sha256而不是300b大小的词向量表示，准确率收敛很慢
 '''
 # coding: UTF-8
 import fasttext
@@ -30,6 +34,7 @@ from io import open
 import glob
 import os
 import math
+import hashlib
 
 batchsz = 1000
 hidden_len = 64
@@ -39,6 +44,10 @@ lr = 0.005
 epochs = 1000
 use_rnn = False #使用rnn还是textCNN网络
 
+def getHash(x):
+    m = hashlib.sha256()
+    m.update(bytes(x, "utf8"))
+    return torch.tensor([int(d)/255 for d in m.digest()])
 
 def loadData():
     all_categories=dict()
@@ -58,17 +67,18 @@ def loadData():
             if len(words) > seq_len:
                 #print("sentence is too long, please change the seq_len variable!\n")
                 words = words[:seq_len]
-# 因为fastText训练好的模型很占用内存，所以训练样本直接放在gpu的内存里了。
-            one_example = torch.zeros((seq_len, ft.get_dimension())).to("cuda:0")
+             # 因为fastText训练好的模型很占用内存，所以训练样本直接放在gpu的内存里了。
+            one_example = torch.zeros((seq_len, emb_sz)).to("cuda:0")
             for i in range(len(words)):
                 w = words[i]
                 one_example[i] = torch.tensor(ft.get_word_vector(w)).to("cuda:0")
+                #one_example[i] = getHash(w).to("cuda:0")
 
             example_list.append(( one_example,  label))
             if len(example_list) > 30000:
                 break
     random.shuffle(example_list)
-    del ft 
+    #del ft
     return example_list, all_categories
 
 examples, categories = loadData()

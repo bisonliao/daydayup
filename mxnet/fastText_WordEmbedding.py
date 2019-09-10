@@ -1,7 +1,20 @@
 '''
 使用fastText训练词向量
 用小说平凡的世界作为语料，使用jieba分词，训练的中文词向量效果不好，可能语料太少
-用600M大小的enwiki9.txt作为语料，训练的英文词向量效果简单看还可以，但没有正式的benchmark评测。训练时间比较长，1个多小时。
+
+用600M大小的enwiki9.txt作为语料，训练的英文词向量效果简单看还可以，下面的测试基本符合预期：
+father neighors: son brother grandfather mother
+berlin-germany+france = paris
+son - father + mother = daughter\wife\daughters
+females neighbors: males median
+see neighbors: list disambiguations
+
+用1.4G大小的wiki.zh.corpus.txt作为语料，训练的中文向量效果简单看还可以，下面的测试符合预期：
+“父亲”的邻居词有“母亲”、“祖父”、“哥哥”等社会关系词
+“柏林”之于“德国”相当于巴黎之于法国
+儿子之于父亲，相当于女儿之于母亲
+米的邻居词有公尺
+由于的邻居词有因此、因为
 '''
 # coding: UTF-8
 import fasttext
@@ -62,7 +75,7 @@ def train(filename:str):
 def cosSim(v1:np.ndarray,v2:np.ndarray):
     return np.dot(v1,v2)/(np.linalg.norm(v1,ord=2)*np.linalg.norm(v2, ord=2))
 
-def test(filename:str):
+def test_en(filename:str):
     model = fasttext.load_model(filename)
     print(model.get_word_id("father"))
     print(model.get_word_id("mother"))
@@ -72,8 +85,27 @@ def test(filename:str):
     print(model.get_nearest_neighbors("father"))
     print(model.get_analogies("berlin", "germany", "france"))
     print(model.get_analogies("son", "father", "mother"))
+    print(model.get_nearest_neighbors("females"))
+    print(model.get_nearest_neighbors("see"))
+
+def test_zh(filename:str):
+    model = fasttext.load_model(filename)
+    print(model.get_word_id("父亲"))
+    print(model.get_word_id("母亲"))
+    print(model.get_word_id("妻子"))
+    print(model.get_word_id("丈夫"))
+
+    print(model.get_nearest_neighbors("父亲"))
+    print(model.get_analogies("柏林", "德国", "法国"))
+    print(model.get_analogies("儿子", "父亲", "母亲"))
+
+    print(model.get_nearest_neighbors("主要"))
+    print(model.get_nearest_neighbors("米"))
+    print(model.get_nearest_neighbors("由于"))
 
 #loadData("E:\\DeepLearning\\data\\nlp_data\\平凡的世界.txt", True)
 #loadData("E:\\DeepLearning\\data\\nlp_data\\English_corpus.txt", False)
 #train("e:/DeepLearning/data/nlp_data/enwik9.txt")
-test("./data/shijie.bin")
+#train("E:\\DeepLearning\\data\\nlp_data\\corpus\\wiki.zh.corpus.txt")
+#test_zh("E:\\DeepLearning\\data\\fastText_model\\zhwiki_bymyself.bin")
+test_en("E:\\DeepLearning\\data\\fastText_model\\enwiki9_bymyself.bin")

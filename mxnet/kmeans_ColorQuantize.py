@@ -4,6 +4,21 @@ from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import random
+import math
+
+
+#用mu律做一些展缩优化看看，发现效果更差。这合理，因为图像
+# 很多像素的绝对值是比较大的，不像音频很多样本的绝对值比较小，展缩就有帮助。
+BASE = math.e
+RATE=3 #大小决定曲线的弯曲度
+SCALE = 255 # 范围
+def mu_law(x):
+    xx = x / SCALE
+    return SCALE* math.log(1+RATE*xx, BASE) / math.log(1+RATE ,BASE)
+def mu_law_back(y):
+    yy = y / SCALE
+    return (math.pow(BASE, yy * math.log(1+RATE,BASE))-1)/RATE * SCALE
+######################################################################
 
 def scatter(p): #三维散点图
     ax = plt.figure().add_subplot(111, projection='3d')
@@ -17,9 +32,9 @@ def scatter(p): #三维散点图
     ax.set_xlabel('X Label')
     ax.set_ylabel('Y Label')
     ax.set_zlabel('Z Label')
-
     # 显示图像
     plt.show()
+
 
 
 def compressImg(path:str):
@@ -58,7 +73,8 @@ def compressImg(path:str):
         for w in range(img.shape[1]):
             for c in range(img.shape[2]):
                 img3[h,w,c] = img[h,w,c]//64 * 64
-            hist3[cnt] = img3[h,w,0]*65536+img3[h,w,1]*256+img3[h,w,2]
+                #img3[h,w,c] = round(mu_law_back(round(mu_law(img[h,w,c])) // 64 *64))
+            #hist3[cnt] = img3[h,w,0]*65536+img3[h,w,1]*256+img3[h,w,2]
             cnt += 1
             if random.randint(0, 1000) > 995:#抽样生成散点图，要不然点太多
                 p3.append( (img[h, w, 0], img[h, w, 1], img[h, w, 2],  [img3[h, w, 2]/255, img3[h, w, 1]/255, img3[h, w, 0]/255] ))
@@ -79,7 +95,7 @@ def compressImg(path:str):
     scatter(p2)
     scatter(p3)
 
-
-
-
 compressImg("e:\\bazha.jpg")
+
+
+

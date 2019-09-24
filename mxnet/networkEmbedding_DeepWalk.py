@@ -101,14 +101,14 @@ def test(model, edges):
 edges = loadData()  # type:lil_matrix
 print("edges number:", edges.nnz)
 if False:
-    geneCorpusFromEdges(edges)
-    print("geneCorpusFromEdges() done!")
-    model = fasttext.train_unsupervised("./data/ne_corpus.txt", epoch = 10000, lr=0.5, dim=DIM) # type:fasttext.FastText._FastText
+    #geneCorpusFromEdges(edges)
+    #print("geneCorpusFromEdges() done!")
+    model = fasttext.train_unsupervised("./data/ne_corpus.txt", epoch = 200, lr=0.0001, dim=DIM) # type:fasttext.FastText._FastText
     model.save_model("./data/network_embedding.bin")
     print(type(model))
-else:
-    model = fasttext.load_model("./data/network_embedding.bin")
-    A = test(model, edges)
+
+model = fasttext.load_model("./data/network_embedding.bin")
+A = test(model, edges)
 
 
 # 用开源的命令行工具生成embeding，加载到BallTree里，查询相似节点
@@ -141,7 +141,6 @@ def deepwalk(edges):
     return neighbors[1][0]
 
 B = deepwalk(edges)
-
 print(jaccardSimilarity(set(A),set(B) ))
 
 

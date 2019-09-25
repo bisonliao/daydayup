@@ -1,10 +1,8 @@
 '''
-对网络实现DeepWalk算法
+对网络实现Node2Vec算法
 用到的数据来自：http://socialcomputing.asu.edu/pages/datasets
-DeepWalk的第二步：n-gram 算法进行词向量学习，使用的是fasttext
+算法第二步：n-gram 算法进行词向量学习，使用的是fasttext
 
-同时使用开源的DeepWalk命令行（https://github.com/phanein/deepwalk）另外
-生成network embedding做AB对比，发现节点58的两种算法下的最近节点没有相交，我的实现可能有问题。通过检查相似用户点的jaccard相似度，两个算法没有明显差距
 用一个小的网络验证，通过图形展示节点位置、聚类的结果可以看出该算法和代码是有效的。
 fasttext训练过程中，lr等几个参数特别关键，需要注意。
 '''
@@ -26,6 +24,8 @@ from  sklearn.cluster import KMeans
 DATA_DIR= "E:\\DeepLearning\\data\\network_data\\BlogCatalog-dataset\\data\\"
 DIM=2
 TEST_USER=2
+P = 10
+Q = 20
 
 # 把csv数据加载为二维array，是一个稀疏矩阵
 def loadData():
@@ -47,12 +47,39 @@ def loadData():
             edges[int(row[1]), int(row[0])] = 1
     return edges
 
+def getNextNode(edges:lil_matrix, v, t, xs:np.ndarray) :
+    if len(xs) < 1:
+        return -1
+    '''index = random.randint(0, len(xs) - 1)
+    return index'''
+    if t == -1:
+        index = random.randint(0, len(xs) - 1)
+        return index
+    ratio = np.zeros_like(xs, dtype="float32")
+    for i in range(len(xs)):
+        if xs[i] == t:
+            ratio[i] = 1/P
+        elif edges[xs[i], t] > 0:
+            ratio[i] = 1
+        else:
+            ratio[i] = 1/Q
+    r = random.randint(0, 1000000) / 1000000 * ratio.sum()
+    for index in range(len(xs)):
+        if r <= 0:
+            return index
+        r -= ratio[index]
+    return index
+
+
+
+
+
 
 # 输入稀疏矩阵，输出一个词库文件：把network embedding问题转化为词向量问题
 def geneCorpusFromEdges(edges:lil_matrix):
     maxUserId = edges.shape[0]-1
     WORD_NUM = 20
-    EXAMP_NUM = maxUserId * 30
+    EXAMP_NUM = maxUserId * 50
     example_list = list()
     for i in range(EXAMP_NUM):
         r = random.randint(1, maxUserId)
@@ -63,12 +90,15 @@ def geneCorpusFromEdges(edges:lil_matrix):
         for j in range(WORD_NUM):
             row = edges[user]
             indices = row.nonzero()[1]
-            if len(indices) < 1:
+            if len(wordList) > 1 :
+                t = int(wordList[-2][1:])
+            else:
+                t = -1
+
+            index = getNextNode(edges, user, t, indices)
+            if index < 0:
                 break
-            index = random.randint(0, len(indices)-1)
             user = indices[index]
-            if len(wordList) > 1 and ("u%d"%user) == wordList[-2]:
-                continue
             wordList.append("u%d" % user)
         example_list.append(" ".join(wordList))
         print("\rgenerate example process %.2f%%"%(i*100/EXAMP_NUM), end='')
@@ -97,10 +127,10 @@ def test(model, edges):
         print("%d \tsim:%f"%(neighbor, jaccardSimilarity(A,B)), end='')
         print("\t", B)
     if DIM == 2 and edges.shape[0] < 1000:
-        graph = from_scipy_sparse_matrix(edges[1:,1:])
-        embedding = np.zeros((edges.shape[0]-1, DIM) )
+        graph = from_scipy_sparse_matrix(edges)
+        embedding = np.zeros((edges.shape[0], DIM) )
         for i in range(edges.shape[0]-1):
-            embedding[i] = model.get_word_vector("u"+str(i+1))
+            embedding[i+1] = model.get_word_vector("u"+str(i+1))
         draw(graph, pos=embedding, with_labels=True)
         plt.show()
 
@@ -109,8 +139,8 @@ def cluster(model:fasttext.FastText._FastText,edges):
     for i in range(edges.shape[0]-1):
         w = "u"+str(i+1)
         m[i] = model.get_word_vector(w)
-    cl = DBSCAN(min_samples=3, metric='cosine', eps=0.05)
-    #cl = KMeans(n_clusters=3)
+    #cl = DBSCAN(min_samples=3, metric='cosine', eps=0.05)
+    cl = KMeans(n_clusters=3)
     print(cl.fit_predict(m))
 
 
@@ -123,8 +153,7 @@ if True:
     print("geneCorpusFromEdges() done!")
     #model = fasttext.train_unsupervised("./data/ne_corpus.txt", epoch = 200, lr=0.0001, dim=DIM,maxn=0) # type:fasttext.FastText._FastText
     #model = fasttext.train_unsupervised("./data/ne_corpus.txt", epoch=100000, lr=0.0001, dim=DIM, maxn=0)  # type:fasttext.FastText._FastText
-    model = fasttext.train_unsupervised("./data/ne_corpus.txt", epoch=100, lr=0.1, dim=DIM,
-                                        maxn=0)  # type:fasttext.FastText._FastText
+    model = fasttext.train_unsupervised("./data/ne_corpus.txt", epoch=400, lr=0.1, dim=DIM, maxn=0)  # type:fasttext.FastText._FastText
     model.save_model("./data/network_embedding.bin")
     print(type(model))
 

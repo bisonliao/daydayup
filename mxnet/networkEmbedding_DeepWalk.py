@@ -97,10 +97,10 @@ def test(model, edges):
         print("%d \tsim:%f"%(neighbor, jaccardSimilarity(A,B)), end='')
         print("\t", B)
     if DIM == 2 and edges.shape[0] < 1000:
-        graph = from_scipy_sparse_matrix(edges[1:,1:])
-        embedding = np.zeros((edges.shape[0]-1, DIM) )
+        graph = from_scipy_sparse_matrix(edges)
+        embedding = np.zeros((edges.shape[0], DIM) )
         for i in range(edges.shape[0]-1):
-            embedding[i] = model.get_word_vector("u"+str(i+1))
+            embedding[i+1] = model.get_word_vector("u"+str(i+1))
         draw(graph, pos=embedding, with_labels=True)
         plt.show()
 

@@ -21,7 +21,7 @@ DIM=20
 TEST_USER=2
 P = 1
 Q = 1
-TRAIN=True
+TRAIN=False
 
 # 把csv数据加载为二维array，是一个稀疏矩阵
 def loadData():
@@ -130,9 +130,7 @@ cl = KMeans(n_clusters=100)
 cluster = cl.fit_predict(m)
 print(cluster)
 clusterEffection(edges, m, cluster)
+
 if DIM == 2 and edges.shape[0] < 100:
-    embedding = np.zeros((edges.shape[0], DIM))
-    for i in range(edges.shape[0] - 1):
-        embedding[i + 1] = model2.wv.get_vector(str(i+1))
-    draw(g, pos=embedding, with_labels=True)
+    draw(g, pos=m, with_labels=True)
     plt.show()

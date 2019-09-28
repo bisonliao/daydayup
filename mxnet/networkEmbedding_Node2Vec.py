@@ -24,7 +24,7 @@ DIM=20
 TEST_USER=2
 P = 1
 Q = 1
-TRAIN=True
+TRAIN=False
 
 # 把csv数据加载为二维array，是一个稀疏矩阵
 def loadData():
@@ -106,6 +106,65 @@ def jaccardSimilarity(A:set,B:set):
     return len(A.intersection(B)) / (len(A.union(B))+0.001)
 def cosDist(v1:np.ndarray,v2:np.ndarray):
     return 1 - np.dot(v1,v2)/(np.linalg.norm(v1,ord=2)*np.linalg.norm(v2, ord=2))
+#检查聚类效果，高内聚、低耦合
+def clusterEffection(Y, U, cluster):
+
+    # 检查簇1 簇2，看看簇内的平均距离，和簇间的平均距离
+    c1 = list()
+    c2 = list()
+    for i in range(1, U.shape[0]):
+        if cluster[i-1] == 5:
+            c1.append(i)
+        elif cluster[i-1] == 2:
+            c2.append(i)
+    if len(c1) < 3 or len(c2) < 3:
+        print("cluster too small!")
+        return
+    print("c1, c2 size:%d,%d"%(len(c1),len(c2)))
+    sum = 0
+    cnt = 0
+    for i in range(len(c1)-1):
+        for j in range(i+1, len(c1)):
+            a = c1[i]
+            b = c1[j]
+            a = U[a]
+            b = U[b]
+            sum += cosDist(a, b)
+            cnt += 1
+    print("%d avg cos distances in cluster:%.2f"%(cnt, sum / cnt))
+    sum = 0
+    cnt = 0
+    for i in range(len(c1)):
+        for j in range(len(c2)):
+            a = c1[i]
+            b = c2[j]
+            a = U[a]
+            b = U[b]
+            sum += cosDist(a, b)
+            cnt += 1
+    print("%d avg cos distances between cluster:%.2f" % (cnt, sum / cnt))
+    ###########################
+    # 检查簇内边的密度和簇间边的密度
+    edgeNum = 0
+    cnt = 0
+    for i in range(len(c1) - 1):
+        for j in range(i + 1, len(c1)):
+            a = c1[i]
+            b = c1[j]
+            if Y[a, b] > 0:
+                edgeNum += 1
+            cnt += 1
+    print("%d avg edges dense in cluster:%.5f" % (cnt, edgeNum / cnt))
+    edgeNum = 0
+    cnt = 0
+    for i in range(len(c1)):
+        for j in range(len(c2)):
+            a = c1[i]
+            b = c2[j]
+            if Y[a, b] > 0:
+                edgeNum += 1
+            cnt += 1
+    print("%d avg edges dense between cluster:%.5f" % (cnt, edgeNum / cnt))
 
 def test(model, edges):
     w = "u"+str(TEST_USER)
@@ -113,15 +172,9 @@ def test(model, edges):
     nn = list(model.get_nearest_neighbors(w, k=5))
     print(nn)
 
+    cluster(model, edges)
 
-    for neighbor in nn:
-        neighbor = int(neighbor[1][1:])
-        B = set(edges[neighbor].nonzero()[1])
-        print("%d \tsim:%f"%(neighbor, jaccardSimilarity(A,B)), end='')
-        print("\t", B)
     if DIM == 2 and edges.shape[0] < 100:
-        cluster(model, edges)
-
         graph = from_scipy_sparse_matrix(edges)
         embedding = np.zeros((edges.shape[0], DIM) )
         for i in range(edges.shape[0]-1):
@@ -130,19 +183,22 @@ def test(model, edges):
         plt.show()
 
 def cluster(model:fasttext.FastText._FastText,edges):
-    m = np.zeros((edges.shape[0]-1, DIM))
-    for i in range(edges.shape[0]-1):
-        w = "u"+str(i+1)
+    m = np.zeros((edges.shape[0], DIM))
+    for i in range(1, edges.shape[0]):
+        w = "u"+str(i)
         m[i] = model.get_word_vector(w)
-    #cl = DBSCAN(min_samples=3, metric='cosine', eps=0.05)
-    cl = KMeans(n_clusters=3)
-    print(cl.fit_predict(m))
+    #cl = DBSCAN( metric='cosine', eps=0.15)
+    cl = KMeans(n_clusters=100)
+    cluster = cl.fit_predict(m)
+    print(cluster)
+    clusterEffection(edges, m, cluster)
+
 
 edges = loadData()  # type:lil_matrix
 print("edges number:", edges.nnz)
 if TRAIN:
-    geneCorpusFromEdges(edges)
-    print("geneCorpusFromEdges() done!")
+    #geneCorpusFromEdges(edges)
+    #print("geneCorpusFromEdges() done!")
     #model = fasttext.train_unsupervised("./data/ne_corpus.txt", epoch = 200, lr=0.0001, dim=DIM,maxn=0) # type:fasttext.FastText._FastText
     #model = fasttext.train_unsupervised("./data/ne_corpus.txt", epoch=100000, lr=0.0001, dim=DIM, maxn=0)  # type:fasttext.FastText._FastText
     model = fasttext.train_unsupervised("./data/ne_corpus.txt", epoch=400, lr=0.1, dim=DIM, maxn=0)  # type:fasttext.FastText._FastText
@@ -152,30 +208,7 @@ if TRAIN:
 model = fasttext.load_model("./data/network_embedding.bin")
 A = test(model, edges)
 
-#############################################################
-# 官方包node2vec的实现
-import networkx as nx
-from node2vec import Node2Vec
-from gensim.models.word2vec import Word2Vec
 
-if TRAIN:
-    #下面两行都可以正确初始化一个graph对象
-    #g = nx.read_adjlist(DATA_DIR+"edges2.csv", delimiter=",", nodetype=int)# type:nx.classes.graph.Graph
-    g=from_scipy_sparse_matrix(edges)
-    n2v = Node2Vec(g, dimensions=DIM, walk_length=20, num_walks=30, p=P, q=Q)
-    model2 = n2v.fit(window=6, min_count=1, batch_words=4) #这里居然是单核训练的，很低效。前面fasttext是多核的
-
-    print(type(model2))
-    model2.save("./data/node2vec.bin")
-
-model2 = Word2Vec.load("./data/node2vec.bin")
-print(model2.wv.most_similar("2", topn=10))
-if DIM == 2 and edges.shape[0] < 100:
-    embedding = np.zeros((edges.shape[0], DIM))
-    for i in range(edges.shape[0] - 1):
-        embedding[i + 1] = model2.wv.get_vector(str(i+1))
-    draw(g, pos=embedding, with_labels=True)
-    plt.show()
 
 
 

@@ -49,9 +49,10 @@ def my_loss(y, label, flags, U):
     return diff    #+nd.sum(nameda * U*U)  #后项是L2正则项防止过拟合
 
 
-def train(adjmatrix, epochs, flags):
+def train(adjmatrix, epochs):
     U = nd.random.uniform(0, 1, shape=(adjmatrix.shape[0], DIM), ctx=context)
     lossum = 0
+    flags = nd.ones(adjmatrix.shape, ctx=context)  # 有边没边都要逼近
     flagsSum = flags.sum().asscalar()
     print("to learn:", adjmatrix.shape[0]*DIM, " equalization:", flagsSum)
     for e in range(epochs):
@@ -75,26 +76,27 @@ def train(adjmatrix, epochs, flags):
 #与上面train()的区别是：为了解决内存放不下的问题，分小块进行梯度下降。
 def train_partition(adjmatrix, epochs):
     U = nd.random.uniform(0, 1, shape=(adjmatrix.shape[0], DIM), ctx=mx.cpu(0))
+    matSize = adjmatrix.shape[0]
     PART_SZ = 5000 #分块的大小， 根据显卡内存大小做适当调整
-    part_num = MATRIX_SZ // PART_SZ
-    if MATRIX_SZ % PART_SZ > 0:
+    part_num = matSize // PART_SZ
+    if matSize % PART_SZ > 0:
         part_num += 1
     for e in range(epochs):
         lossum = 0
         for i in range(part_num):
             x = i*PART_SZ
             width = PART_SZ
-            if x+width > MATRIX_SZ:
-                width = MATRIX_SZ-x
+            if x+width > matSize:
+                width = matSize-x
             left = U[x:x+width].as_in_context(context)
             for j in range(part_num):
                 y = j * PART_SZ
                 height = PART_SZ
-                if y+height > MATRIX_SZ:
-                    height = MATRIX_SZ-y
+                if y+height > matSize:
+                    height = matSize-y
                 right = U[y:y+height].as_in_context(context)
-                #flags = nd.ones((width,height),ctx=context) #有边每边都要逼近
-                flags = adjmatrix[x:x+width,y:y+height] #只考虑有边相连
+                flags = nd.ones((width,height),ctx=context) #有边没边都要逼近
+                #flags = adjmatrix[x:x+width,y:y+height].as_in_context(context) #只考虑有边相连
 
                 left.attach_grad()
                 right.attach_grad()
@@ -110,10 +112,22 @@ def train_partition(adjmatrix, epochs):
                     U[y:y + height] = right.as_in_context(mx.cpu(0))
 
         if e % 100 == 0:
-            print("ep:%d, loss:%.4f"%(e,lossum/MATRIX_SZ/MATRIX_SZ))
+            print("ep:%d, loss:%.4f"%(e,lossum/matSize/matSize))
     return U.as_in_context(context)
 
-
+#测试上面两个关键函数的代码
+def test():
+    global DIM
+    global lr
+    DIM = 20
+    lr = 1e-7
+    adjmatrix = nd.random_uniform(1,10, (10000,10), context )
+    adjmatrix = nd.dot(adjmatrix, adjmatrix.transpose())
+    U = train_partition(adjmatrix, 30000)
+    diff = (nd.dot(U, U.transpose())-adjmatrix)/adjmatrix
+    print(diff.max())
+    print(diff.min())
+    exit(0)
 
 
 if False:
@@ -124,8 +138,7 @@ if False:
     if MATRIX_SZ > 1000: #太大了，分块训练
         U = train_partition(Y, epochs)
     else:
-        flags = nd.ones((MATRIX_SZ, MATRIX_SZ), ctx=context)
-        U = train(Y, epochs, flags) #type:nd.NDArray
+        U = train(Y, epochs) #type:nd.NDArray
     with open("./data/U.data", "wb") as f:
         pickle.dump(U, f)
     with open("./data/Y.data", "wb") as f:
@@ -158,6 +171,7 @@ from  sklearn.cluster import DBSCAN
 from  sklearn.neighbors import BallTree
 from networkx import from_scipy_sparse_matrix, draw, from_numpy_array
 import matplotlib.pyplot as plt
+CLUSTER_NUM = 100
 
 def cosDist(v1:np.ndarray,v2:np.ndarray):
     return 1 - np.dot(v1,v2)/(np.linalg.norm(v1,ord=2)*np.linalg.norm(v2, ord=2))
@@ -165,68 +179,60 @@ def cosDist(v1:np.ndarray,v2:np.ndarray):
 #检查聚类效果，高内聚、低耦合
 def clusterEffection(Y, U, cluster):
 
-    # 检查簇1 簇2，看看簇内的平均距离，和簇间的平均距离
-    c1 = list()
-    c2 = list()
-    for i in range(1, U.shape[0]):
-        if cluster[i-1] == 3:
-            c1.append(i)
-        elif cluster[i-1] == 7:
-            c2.append(i)
-    if len(c1) < 3 or len(c2) < 3:
-        print("cluster too small!")
-        return
-    print("c1, c2 size:%d,%d"%(len(c1),len(c2)))
-    sum = 0
-    cnt = 0
-    for i in range(len(c1)-1):
-        for j in range(i+1, len(c1)):
-            a = c1[i]
-            b = c1[j]
-            a = U[a]
-            b = U[b]
-            sum += cosDist(a, b)
-            cnt += 1
-    print("%d avg cos distances in cluster:%.2f"%(cnt, sum / cnt))
-    sum = 0
-    cnt = 0
-    for i in range(len(c1)):
-        for j in range(len(c2)):
-            a = c1[i]
-            b = c2[j]
-            a = U[a]
-            b = U[b]
-            sum += cosDist(a, b)
-            cnt += 1
-    print("%d avg cos distances between cluster:%.2f" % (cnt, sum / cnt))
-    ###########################
-    # 检查簇内边的密度和簇间边的密度
-    edgeNum = 0
-    cnt = 0
-    for i in range(len(c1) - 1):
-        for j in range(i + 1, len(c1)):
-            a = c1[i]
-            b = c1[j]
-            if Y[a, b] > 0:
-                edgeNum += 1
-            cnt += 1
-    print("%d avg edges dense in cluster:%.5f" % (cnt, edgeNum / cnt))
-    edgeNum = 0
-    cnt = 0
-    for i in range(len(c1)):
-        for j in range(len(c2)):
-            a = c1[i]
-            b = c2[j]
-            if Y[a, b] > 0:
-                edgeNum += 1
-            cnt += 1
-    print("%d avg edges dense between cluster:%.5f" % (cnt, edgeNum / cnt))
+    cls = list()
+    for i in range(CLUSTER_NUM):
+        cls.append(list())
+    for i in range(len(cluster)):
+        cls[ cluster[i] ].append(i+1)
 
+
+    #簇内边密度均值
+    edgeNum = 0
+    cnt = 0
+    for k in range(CLUSTER_NUM):
+        c1 = cls[k]
+        if len(c1) < 3 or len(c1)>100: #为了计算高效，只抽查大小适中的簇
+            continue
+
+        for i in range(len(c1) - 1):
+            for j in range(i + 1, len(c1)):
+                a = c1[i]
+                b = c1[j]
+                if Y[a, b] > 0:
+                    edgeNum += 1
+                cnt += 1
+    print("avg edges dense in cluster:%.5f" % (edgeNum / cnt))
+
+    #簇间边密度均值
+    edgeNum = 0
+    cnt = 0
+    for k in range(CLUSTER_NUM):
+        c1 = cls[k]
+        if len(c1) < 3  or len(c1)>100:
+            continue
+        for z in range(k+1, CLUSTER_NUM):
+            c1 = cls[k]
+            c2 = cls[z]
+            if len(c2) < 3  or len(c2)>100: #为了计算高效，只抽查大小适中的簇
+                continue
+
+            for i in range(len(c1)):
+                for j in range(len(c2)):
+                    a = c1[i]
+                    b = c2[j]
+                    if Y[a, b] > 0:
+                        edgeNum += 1
+                    cnt += 1
+            if cnt > 100000:
+                break
+        if cnt > 100000:
+            break
+    print("avg edges dense between cluster:%.5f" % (edgeNum / cnt))
 
 
 ######聚类的结果
 U = U.asnumpy()
-cl = KMeans(n_clusters=100)
+cl = KMeans(n_clusters=CLUSTER_NUM)
 # 通过调整eps，使得这1万多个点聚类为17个簇，同时有1314个点被认为是噪声点
 #cl = DBSCAN( metric='cosine', eps=0.28)
 cluster = cl.fit_predict(U[1:])

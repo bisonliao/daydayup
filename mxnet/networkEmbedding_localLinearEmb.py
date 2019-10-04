@@ -42,14 +42,10 @@ def loadData():
 ############################################################
 
 def my_loss(adj, U):
-    diff = U - nd.dot(adj, U)
-    diff2 = 0.01 / ( U + nd.ones_like(U)*0.00001)
+    diff = U - nd.dot(adj / adj.shape[0], U)
+    diff2 = 1 / ( U + nd.ones_like(U)*0.00001)#这一项防止U趋近0
 
-#这一项防止U趋近0
-    '''diff2 = 0.001 / ( U + nd.ones_like(U)*0.00001)
-    diff2 = nd.norm(diff2, 2)'''
-
-    return  nd.norm(diff, 2)
+    return  nd.norm(diff, 2)+nd.norm(diff2, 2)
 
 
 def train(adjmatrix, epochs):
@@ -132,10 +128,14 @@ def test():
 if True:
     m = loadData() # type:lil_matrix
     Y = nd.array(m.toarray(),ctx=context)
-    if MATRIX_SZ > 1000: #太大了，分块训练
+
+    w,vec = np.linalg.eig(m.toarray())
+    '''if MATRIX_SZ > 1000: #太大了，分块训练
         U = train_partition(Y, epochs)
     else:
         U = train(Y, epochs) #type:nd.NDArray
+    '''
+    U = nd.array(vec[:, :2], ctx=context)
     with open("./data/localLinear_U.data", "wb") as f:
         pickle.dump(U, f)
     with open("./data/localLinear_Y.data", "wb") as f:
@@ -229,7 +229,7 @@ clusterEffection(Y, U, cluster)
 
 ### 可视化 与 相似节点的查询结果
 if DIM == 2 and Y.shape[0] < 100:
-    tree = BallTree(U, metric='pyfunc', func=cosDist)
+    tree = BallTree(U[1:], metric='pyfunc', func=cosDist)
     print(tree.query([U[2]], k=7))
     graph = from_numpy_array(Y.asnumpy())
     draw(graph, pos=U, with_labels=True)

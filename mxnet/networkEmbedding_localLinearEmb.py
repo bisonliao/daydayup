@@ -1,6 +1,5 @@
 '''
-将邻接矩阵 Y 分解为 U 点乘 U的转置的形式
-U的每一行就是一个节点的embedding
+没有搞定, U退化为0，加约束的正则项也不怎么起作用
 '''
 # coding: utf-8
 import numpy as np
@@ -13,12 +12,13 @@ import pickle
 import random
 
 DATA_DIR= "E:\\DeepLearning\\data\\network_data\\BlogCatalog-dataset\\data\\"
-MATRIX_SZ = 10313
-#MATRIX_SZ=15
-DIM = 20
+#MATRIX_SZ = 10313
+MATRIX_SZ=15
+DIM = 2
+CLUSTER_NUM = 3
 context = mx.gpu(0)
-lr = 0.000005
-epochs=5000
+lr = 0.005
+epochs=20000
 
 # 把csv数据加载为二维array，是一个稀疏矩阵
 def loadData():
@@ -29,9 +29,9 @@ def loadData():
             if int(row[0]) > maxUserId:
                 maxUserId = int(row[0])
     print("maxUserId:", maxUserId)
-    #maxUserId = MATRIX_SZ-1 #小网络直观验证开启
+    maxUserId = MATRIX_SZ-1 #小网络直观验证开启
     edges = lil_matrix((maxUserId+1, maxUserId+1), dtype="uint8")
-    with open(DATA_DIR+"edges.csv", "r", encoding="utf8") as f:
+    with open(DATA_DIR+"edges2.csv", "r", encoding="utf8") as f:
         reader = csv.reader(f)
         for row in reader:
             if int(row[0]) > maxUserId or int(row[1]) > maxUserId:
@@ -40,35 +40,33 @@ def loadData():
             edges[int(row[1]), int(row[0])] = 1
     return edges
 ############################################################
-### 使用mxnet做梯度下降的训练，求U满足U点乘U的转置等于 Y
-### 有个参数叫flags，是一个与邻接矩阵等形状的矩阵，用于标识邻接矩阵中哪些元素要求逼近（1），哪些不在乎（0）
-### 目前的例子里是一个全1的矩阵，即每个元素都要求逼近。
-def my_loss(y, label, flags, U):
-    nameda = 0.0001
-    diff = (y - label)*(y-label)*flags
-    diff = nd.sum(diff)
-    return diff    #+nd.sum(nameda * U*U)  #后项是L2正则项防止过拟合
+
+def my_loss(adj, U):
+    diff = U - nd.dot(adj, U)
+    diff2 = 0.01 / ( U + nd.ones_like(U)*0.00001)
+
+#这一项防止U趋近0
+    '''diff2 = 0.001 / ( U + nd.ones_like(U)*0.00001)
+    diff2 = nd.norm(diff2, 2)'''
+
+    return  nd.norm(diff, 2)
 
 
 def train(adjmatrix, epochs):
-    U = nd.random.uniform(0, 1, shape=(adjmatrix.shape[0], DIM), ctx=context)
+    U = nd.random.uniform(1, 10, shape=(adjmatrix.shape[0], DIM), ctx=context)
+    SZ = adjmatrix.shape[0] * DIM
     lossum = 0
-    flags = nd.ones(adjmatrix.shape, ctx=context)  # 有边没边都要逼近
-    flagsSum = flags.sum().asscalar()
-    print("to learn:", adjmatrix.shape[0]*DIM, " equalization:", flagsSum)
     for e in range(epochs):
         U.attach_grad()
-
         with autograd.record():
-            Y = nd.dot(U,U.transpose())
-            L = my_loss(Y, adjmatrix,flags,  U)
+            L = my_loss(adjmatrix,U)
         L.backward()
         lossum += L.asscalar()
-        GAP = 100
+        GAP = 1000
         if e == 0:
-            print("ep:%d, loss:%.4f"%(e,lossum/flagsSum))
+            print("ep:%d, loss:%.4f"%(e,lossum/SZ))
         if e % GAP == 0 and e != 0 :
-            avgLoss = lossum/GAP/flagsSum
+            avgLoss = lossum/GAP/SZ
             lossum = 0
             print("ep:%d, loss:%.4f"%(e,avgLoss))
         U = U - lr * U.grad
@@ -131,48 +129,36 @@ def test():
     exit(0)
 
 
-if False:
+if True:
     m = loadData() # type:lil_matrix
-    for i in range(MATRIX_SZ):
-        m[i,i] = 1
     Y = nd.array(m.toarray(),ctx=context)
     if MATRIX_SZ > 1000: #太大了，分块训练
         U = train_partition(Y, epochs)
     else:
         U = train(Y, epochs) #type:nd.NDArray
-    with open("./data/U.data", "wb") as f:
+    with open("./data/localLinear_U.data", "wb") as f:
         pickle.dump(U, f)
-    with open("./data/Y.data", "wb") as f:
+    with open("./data/localLinear_Y.data", "wb") as f:
         pickle.dump(Y, f)
 else:
-    with open("./data/U.data", "rb") as f:
+    with open("./data/localLinear_U.data", "rb") as f:
         U = pickle.load(f)
-    with open("./data/Y.data", "rb") as f:
+    with open("./data/localLinear_Y.data", "rb") as f:
         Y = pickle.load(f)
 
 ###########################################################
 ## 训练完了，就要用聚类、查询相似节点、可视化等各种手段检查embedding是否符合预期了
-if Y.shape[0] < 100:
-    v =nd.array(nd.dot(U,U.transpose()), ctx=context)
-    for i in range(MATRIX_SZ):
-        for j in range(MATRIX_SZ):
-            if v[i,j] >= 0.5:
-                v[i,j] = 1
-            elif v[i,j] <= -0.5:
-                v[i, j] = -1
-            else:
-                v[i,j] = 0
-    print((v-Y).as_in_context(context)*flags)
-
-
-
+if DIM == 2 and Y.shape[0] < 100:
+    print(U)
+    print(nd.dot(Y,U))
+    print( (U - nd.dot(Y,U))/(U+0.001))
 
 from  sklearn.cluster import KMeans
 from  sklearn.cluster import DBSCAN
 from  sklearn.neighbors import BallTree
 from networkx import from_scipy_sparse_matrix, draw, from_numpy_array
 import matplotlib.pyplot as plt
-CLUSTER_NUM = 100
+
 
 def cosDist(v1:np.ndarray,v2:np.ndarray):
     return 1 - np.dot(v1,v2)/(np.linalg.norm(v1,ord=2)*np.linalg.norm(v2, ord=2))
@@ -202,7 +188,7 @@ def clusterEffection(Y, U, cluster):
                 if Y[a, b] > 0:
                     edgeNum += 1
                 cnt += 1
-    print("avg edges dense in cluster:%.5f" % (edgeNum / cnt))
+    print("avg edges dense in cluster:%.5f" % (edgeNum / (0.001+cnt)))
 
     #簇间边密度均值
     edgeNum = 0
@@ -228,7 +214,7 @@ def clusterEffection(Y, U, cluster):
                 break
         if cnt > 100000:
             break
-    print("avg edges dense between cluster:%.5f" % (edgeNum / cnt))
+    print("avg edges dense between cluster:%.5f" % (edgeNum / (cnt+0.001)))
 
 
 ######聚类的结果
@@ -237,7 +223,7 @@ cl = KMeans(n_clusters=CLUSTER_NUM)
 # 通过调整eps，使得这1万多个点聚类为17个簇，同时有1314个点被认为是噪声点
 #cl = DBSCAN( metric='cosine', eps=0.28)
 cluster = cl.fit_predict(U[1:])
-print("cluster labels:", set(cluster))
+print("cluster labels:", cluster)
 print("noisy node:", np.array([1 if c == -1 else 0 for c in cluster]).sum()) #有多少个被聚类算法认为是噪声？
 clusterEffection(Y, U, cluster)
 

@@ -25,6 +25,7 @@ TEST_USER=2
 P = 1
 Q = 1
 TRAIN=False
+CLUSTER_NUM = 100
 
 # 把csv数据加载为二维array，是一个稀疏矩阵
 def loadData():
@@ -108,63 +109,57 @@ def cosDist(v1:np.ndarray,v2:np.ndarray):
     return 1 - np.dot(v1,v2)/(np.linalg.norm(v1,ord=2)*np.linalg.norm(v2, ord=2))
 #检查聚类效果，高内聚、低耦合
 def clusterEffection(Y, U, cluster):
+    print("cluster labels number:",len(cluster))
+    cls = list()
+    for i in range(CLUSTER_NUM):
+        cls.append(list())
+    for i in range(len(cluster)):
+        cls[ cluster[i] ].append(i+1)
 
-    # 检查簇1 簇2，看看簇内的平均距离，和簇间的平均距离
-    c1 = list()
-    c2 = list()
-    for i in range(1, U.shape[0]):
-        if cluster[i-1] == 5:
-            c1.append(i)
-        elif cluster[i-1] == 2:
-            c2.append(i)
-    if len(c1) < 3 or len(c2) < 3:
-        print("cluster too small!")
-        return
-    print("c1, c2 size:%d,%d"%(len(c1),len(c2)))
-    sum = 0
-    cnt = 0
-    for i in range(len(c1)-1):
-        for j in range(i+1, len(c1)):
-            a = c1[i]
-            b = c1[j]
-            a = U[a]
-            b = U[b]
-            sum += cosDist(a, b)
-            cnt += 1
-    print("%d avg cos distances in cluster:%.2f"%(cnt, sum / cnt))
-    sum = 0
-    cnt = 0
-    for i in range(len(c1)):
-        for j in range(len(c2)):
-            a = c1[i]
-            b = c2[j]
-            a = U[a]
-            b = U[b]
-            sum += cosDist(a, b)
-            cnt += 1
-    print("%d avg cos distances between cluster:%.2f" % (cnt, sum / cnt))
-    ###########################
-    # 检查簇内边的密度和簇间边的密度
+    random.shuffle(cls)
+
+    #簇内边密度均值
     edgeNum = 0
     cnt = 0
-    for i in range(len(c1) - 1):
-        for j in range(i + 1, len(c1)):
-            a = c1[i]
-            b = c1[j]
-            if Y[a, b] > 0:
-                edgeNum += 1
-            cnt += 1
-    print("%d avg edges dense in cluster:%.5f" % (cnt, edgeNum / cnt))
+    for k in range(CLUSTER_NUM):
+        c1 = cls[k]
+        if len(c1) < 3 or len(c1)>100: #为了计算高效，只抽查大小适中的簇
+            continue
+
+        for i in range(len(c1) - 1):
+            for j in range(i + 1, len(c1)):
+                a = c1[i]
+                b = c1[j]
+                if Y[a, b] > 0:
+                    edgeNum += 1
+                cnt += 1
+    print("avg edges dense in cluster:%.5f" % (edgeNum / cnt))
+
+    #簇间边密度均值
     edgeNum = 0
     cnt = 0
-    for i in range(len(c1)):
-        for j in range(len(c2)):
-            a = c1[i]
-            b = c2[j]
-            if Y[a, b] > 0:
-                edgeNum += 1
-            cnt += 1
-    print("%d avg edges dense between cluster:%.5f" % (cnt, edgeNum / cnt))
+    for k in range(CLUSTER_NUM):
+        c1 = cls[k]
+        if len(c1) < 3  or len(c1)>100:
+            continue
+        for z in range(k+1, CLUSTER_NUM):
+            c1 = cls[k]
+            c2 = cls[z]
+            if len(c2) < 3  or len(c2)>100: #为了计算高效，只抽查大小适中的簇
+                continue
+
+            for i in range(len(c1)):
+                for j in range(len(c2)):
+                    a = c1[i]
+                    b = c2[j]
+                    if Y[a, b] > 0:
+                        edgeNum += 1
+                    cnt += 1
+            if cnt > 100000:
+                break
+        if cnt > 100000:
+            break
+    print("avg edges dense between cluster:%.5f" % (edgeNum / cnt))
 
 def test(model, edges):
     w = "u"+str(TEST_USER)
@@ -188,10 +183,10 @@ def cluster(model:fasttext.FastText._FastText,edges):
         w = "u"+str(i)
         m[i] = model.get_word_vector(w)
     #cl = DBSCAN( metric='cosine', eps=0.15)
-    cl = KMeans(n_clusters=100)
-    cluster = cl.fit_predict(m)
+    cl = KMeans(n_clusters=CLUSTER_NUM )
+    cluster = cl.fit_predict(m[1:])
     print(cluster)
-    clusterEffection(edges, m, cluster)
+    clusterEffection(edges.toarray(), m, cluster)
 
 
 edges = loadData()  # type:lil_matrix

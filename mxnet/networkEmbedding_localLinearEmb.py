@@ -1,5 +1,6 @@
 '''
-没有搞定, U退化为0，加约束的正则项也不怎么起作用
+梯度下降的方法没有搞定, U退化为0，加约束的正则项也不怎么起作用
+用特征值特征向量的方法可以搞定
 '''
 # coding: utf-8
 import numpy as np
@@ -11,11 +12,12 @@ import mxnet.autograd as autograd
 import pickle
 import random
 
+
 DATA_DIR= "E:\\DeepLearning\\data\\network_data\\BlogCatalog-dataset\\data\\"
-#MATRIX_SZ = 10313
-MATRIX_SZ=15
-DIM = 2
-CLUSTER_NUM = 3
+MATRIX_SZ = 10313
+#MATRIX_SZ=15
+DIM = 20
+CLUSTER_NUM = 100
 context = mx.gpu(0)
 lr = 0.005
 epochs=20000
@@ -29,9 +31,9 @@ def loadData():
             if int(row[0]) > maxUserId:
                 maxUserId = int(row[0])
     print("maxUserId:", maxUserId)
-    maxUserId = MATRIX_SZ-1 #小网络直观验证开启
+    #maxUserId = MATRIX_SZ-1 #小网络直观验证开启
     edges = lil_matrix((maxUserId+1, maxUserId+1), dtype="uint8")
-    with open(DATA_DIR+"edges2.csv", "r", encoding="utf8") as f:
+    with open(DATA_DIR+"edges.csv", "r", encoding="utf8") as f:
         reader = csv.reader(f)
         for row in reader:
             if int(row[0]) > maxUserId or int(row[1]) > maxUserId:
@@ -68,74 +70,21 @@ def train(adjmatrix, epochs):
         U = U - lr * U.grad
     return U
 
-#与上面train()的区别是：为了解决内存放不下的问题，分小块进行梯度下降。
-def train_partition(adjmatrix, epochs):
-    U = nd.random.uniform(0, 1, shape=(adjmatrix.shape[0], DIM), ctx=mx.cpu(0))
-    matSize = adjmatrix.shape[0]
-    PART_SZ = 5000 #分块的大小， 根据显卡内存大小做适当调整
-    part_num = matSize // PART_SZ
-    if matSize % PART_SZ > 0:
-        part_num += 1
-    for e in range(epochs):
-        lossum = 0
-        for i in range(part_num):
-            x = i*PART_SZ
-            width = PART_SZ
-            if x+width > matSize:
-                width = matSize-x
-            left = U[x:x+width].as_in_context(context)
-            for j in range(part_num):
-                y = j * PART_SZ
-                height = PART_SZ
-                if y+height > matSize:
-                    height = matSize-y
-                right = U[y:y+height].as_in_context(context)
-                flags = nd.ones((width,height),ctx=context) #有边没边都要逼近
-                #flags = adjmatrix[x:x+width,y:y+height].as_in_context(context) #只考虑有边相连
-
-                left.attach_grad()
-                right.attach_grad()
-                with autograd.record():
-                    Y = nd.dot(left, right.transpose())
-                    L = my_loss(Y, adjmatrix[x:x+width,y:y+height],flags,  left)
-                L.backward()
-                lossum += L.asscalar()
-                left = left - lr * left.grad
-                U[x:x + width] = left.as_in_context(mx.cpu(0))
-                if i != j:
-                    right = right - lr*right.grad
-                    U[y:y + height] = right.as_in_context(mx.cpu(0))
-
-        if e % 100 == 0:
-            print("ep:%d, loss:%.4f"%(e,lossum/matSize/matSize))
-    return U.as_in_context(context)
-
-#测试上面两个关键函数的代码
-def test():
-    global DIM
-    global lr
-    DIM = 20
-    lr = 1e-7
-    adjmatrix = nd.random_uniform(1,10, (10000,10), context )
-    adjmatrix = nd.dot(adjmatrix, adjmatrix.transpose())
-    U = train_partition(adjmatrix, 30000)
-    diff = (nd.dot(U, U.transpose())-adjmatrix)/adjmatrix
-    print(diff.max())
-    print(diff.min())
-    exit(0)
 
 
-if True:
+if False:
     m = loadData() # type:lil_matrix
     Y = nd.array(m.toarray(),ctx=context)
 
     w,vec = np.linalg.eig(m.toarray())
+
+
     '''if MATRIX_SZ > 1000: #太大了，分块训练
         U = train_partition(Y, epochs)
     else:
         U = train(Y, epochs) #type:nd.NDArray
     '''
-    U = nd.array(vec[:, :2], ctx=context)
+    U = nd.array(vec[:, :DIM], ctx=context)
     with open("./data/localLinear_U.data", "wb") as f:
         pickle.dump(U, f)
     with open("./data/localLinear_Y.data", "wb") as f:

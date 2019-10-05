@@ -10,6 +10,8 @@ import mxnet as mx
 import mxnet.autograd as autograd
 import pickle
 import random
+import time
+import datetime
 
 
 DATA_DIR= "E:\\DeepLearning\\data\\network_data\\BlogCatalog-dataset\\data\\"
@@ -18,8 +20,9 @@ MATRIX_SZ = 10313
 DIM = 20
 CLUSTER_NUM = 100
 context = mx.gpu(0)
-lr = 0.001
+lr = 0.005
 epochs=10000
+
 
 # 把csv数据加载为二维array，是一个稀疏矩阵
 def loadData():
@@ -81,7 +84,7 @@ def train(adjmatrix:nd.NDArray, epochs):
 def train_partition(adjmatrix, epochs):
     U = nd.random.uniform(0, 1, shape=(adjmatrix.shape[0], DIM), ctx=mx.cpu(0))
     matSize = adjmatrix.shape[0]
-    PART_SZ = 5000 #分块的大小， 根据显卡内存大小做适当调整
+    PART_SZ = 6000 #分块的大小， 根据显卡内存大小做适当调整
     part_num = matSize // PART_SZ
     if matSize % PART_SZ > 0:
         part_num += 1
@@ -113,10 +116,10 @@ def train_partition(adjmatrix, epochs):
                     U[y:y + height] = right.as_in_context(mx.cpu(0))
 
         if e % 100 == 0:
-            print("ep:%d, loss:%.10f"%(e,lossum/matSize/matSize))
+            print(datetime.datetime.now().strftime('%H:%M:%S'), " ep:%d, loss:%.10f"%(e,lossum/matSize/matSize))
     return U.as_in_context(context)
 
-if True:
+if False:
     m = loadData() # type:lil_matrix
     Y = nd.array(m.toarray(),ctx=context)
 

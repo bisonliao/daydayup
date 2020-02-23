@@ -14,4 +14,5 @@
 * PCMPlayer 使用AudioTrack和AudioRecord组件录制和播放PCM数据的例子，InteliJ工程
 * lame 研究lame库的一些代码
 * my_compiler_os 2004年左右的代码，当时冲动的实现自己的脚本语言解释器和嵌入式OS。不一定有多大参考价值，青春记忆吧，留下来。好几个目录是相似的，时间太久也搞不清是什么区别，先扔上来吧。
-* mxnet：一些练习demo，算是https://gluon.mxnet.io/学习笔记
+* mxnet：一些练习demo，算是https://gluon.mxnet.io/学习笔记；其中也有pycaffe的练习代码
+* dubboDemo：阿里开源的RPC框架dubbo的一个使用demo，使用IDEA环境下的maven管理

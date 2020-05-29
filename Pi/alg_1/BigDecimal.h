@@ -11,36 +11,6 @@
  * 
  * use BigDecimal defined by myself to calculate.
  */
-/**********************************************************
-    BigDecimal e;
-    BigDecimal v;
-    bigdecimal_assign(&e, "2.5");
-    bigdecimal_assign(&v, "0.5");
-
-
-    for (int i = 3; ; ++i)
-    {
-        BigDecimal result1, result2;
-        bigdecimal_div(&v, i, &result1);
-        bigdecimal_add(&e, &result1, &result2);
-
-        BigDecimal oldvalue = e;
-        e = result2;
-        v = result1;
-
-      
-        if (memcmp(&e, &oldvalue, sizeof(BigDecimal)) == 0)
-        {
-            printf("i=%d\n", i);
-            break;
-        }
-        
-    }
-    static char str[100000];
-    bigdecimal_tostring(&e, str);
-    printf("%s\n", str);
-    printf("len=%d\n", strlen(str));
-************************************************************/
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -63,4 +33,5 @@ int bigdecimal_div(const BigDecimal* a, unsigned int b, BigDecimal *result);
 int bigdecimal_add(const BigDecimal* a, const BigDecimal* b, BigDecimal *result);
 
 int bigdecimal_compute_pai();
+int bigdecimal_compute_e();
 

@@ -1,8 +1,14 @@
 # -*- coding: UTF-8 -*-
 '''
 denseNet, 使用cifa-10数据集合进行训练
-top1准确率达75%， top3可以达到94%
+top1准确率达到75%， top3可以达到94%
 因为cifa的图片很小，33X33，10分类情况下这个准确率应该靠谱
+
+vgg16, 使用cifa-10数据集合进行训练
+top1准确率只能到72%，top3达到93.5%
+loss在每个样本平均0.0003左右不再收敛。（有对lr反复调整尝试）
+
+网上有人用ResNet准确率能到95%，不知道是怎么做到的。
 '''
 
 from torchvision import models

@@ -40,6 +40,7 @@ def get_upsampling_weight(in_channels, out_channels, kernel_size):
     return torch.from_numpy(weight).float()
 
 
+#网友实现的FCN，vgg16+deconv，结构比较清晰
 class FCN8s(nn.Module):
 
     def __init__(self, n_class=21):
@@ -378,7 +379,7 @@ if compute:
     #load(model, 1300)
     # trainer = torch.optim.SGD(model.parameters(), lr,momentum=0.9, weight_decay=0.001)
     trainer = torch.optim.Adam(model.parameters(), lr)
-    #lossfun = nn.CrossEntropyLoss()
+    #lossfun = nn.CrossEntropyLoss() #这样也可以的
     lossfun = cross_entropy2d
 
     lossSum = 0

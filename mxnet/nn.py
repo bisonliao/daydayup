@@ -12,9 +12,9 @@ import torch.nn.functional as F
 import torch.jit
 
 batchsz = 100
-lr = 0.001
+lr = 0.01
 inputsz = 40
-epochnm = 300
+epochnm = 30
 minbatch = 0
 compute = True
 
@@ -31,7 +31,8 @@ class myDataset(dataset.Dataset):
         self.test = list()
 
         for i in range(len(X_moons)):  # type: int
-            t = (torch.tensor([ float(X_moons[i][j]) for j in range(len(X_moons[i]))]), y_moons[i])
+            #t = (torch.tensor([ float( (X_moons[i][j]+5) / 10.0) for j in range(len(X_moons[i]))]), y_moons[i]) #归一化反而效果很差，搞不太懂
+            t = (torch.tensor([float(X_moons[i][j] ) for j in range(len(X_moons[i]))]), y_moons[i])
             self.train.append(t)
             r = random.randint(0, 10)
             if r > 9:
@@ -69,14 +70,16 @@ test_data = dataloader.DataLoader(set1, batchsz, False)  # type:dataloader.DataL
 class MyModel(nn.Module):
     def __init__(self):
         super(MyModel, self).__init__()
-        self.fc1 = nn.Linear(2, 5)
-        self.fc2 = nn.Linear(5, 2)
+        self.fc1 = nn.Linear(2, 16)
+        self.fc2 = nn.Linear(16, 8)
+        self.fc3 = nn.Linear(8, 2)
 
 
     def forward(self, x):
         x = x.reshape(x.shape[0], -1)
         x = nn.functional.relu(self.fc1(x))
-        x = self.fc2(x)
+        x = nn.functional.relu(self.fc2(x))
+        x = self.fc3(x)
         return x
 
 

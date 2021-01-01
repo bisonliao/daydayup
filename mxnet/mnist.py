@@ -9,6 +9,8 @@ import torch.utils.data.dataloader as dataloader
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.jit
+import time
+import datetime
 
 batchsz = 100
 lr = 0.0001
@@ -16,6 +18,11 @@ epochnm = 1
 minbatch = 0
 compute = True
 
+#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = "cpu"
+print("device=", device)
+
+begin = time.mktime(datetime.datetime.now().timetuple())
 
 
 transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
@@ -50,6 +57,8 @@ def test(model, test_data):
     total = 0
     same = 0
     for inputs, labels in test_data:
+        inputs = inputs.to(device)
+        labels = labels.to(device)
         y = model(inputs)
         y = s(y)
         y = torch.max(y, 1)  # type:torch.return_types.max
@@ -66,10 +75,14 @@ def draw(model, test_data):
 
 
     for inputs, labels in test_data:
+        inputs = inputs.to(device)
+        labels = labels.to(device)
         y = model(inputs)
         y = s(y)
         y = torch.max(y, 1)  # type:torch.return_types.max
         y = y.indices
+        y = y.to("cpu")
+        inputs = inputs.to("cpu")
         for i in range(batchsz):
             plt.imshow(inputs[i,0])
             plt.show()
@@ -78,6 +91,7 @@ def draw(model, test_data):
 
 # 训练
 model = MyModel()
+model = model.to(device)
 if compute:
     trainer = torch.optim.Adam(model.parameters(), lr)
     lossfun = nn.CrossEntropyLoss()
@@ -87,6 +101,8 @@ if compute:
         model.train()
 
         for inputs, labels in train_data:
+            inputs = inputs.to(device)
+            labels = labels.to(device)
             minbatch += 1
 
             y = model(inputs)
@@ -96,7 +112,7 @@ if compute:
             L.backward()
             trainer.step()
 
-            lossSum = lossSum + L.data.numpy()
+            lossSum = lossSum + L.data.to("cpu").numpy()
             if minbatch % 10 == 0:
                 print(e, " ", minbatch, " ", lossSum / 200)
                 lossSum = 0
@@ -104,6 +120,11 @@ if compute:
                 print(e, " acc:", test(model, test_data))
         model.train()
 
+
+end = time.mktime(datetime.datetime.now().timetuple())
+print("used seconds:", end-begin)
 draw(model, test_data)
+
+
 
 

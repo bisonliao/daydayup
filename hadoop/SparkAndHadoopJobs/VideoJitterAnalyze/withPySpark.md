@@ -1,12 +1,18 @@
 topic:  
 
-Users of app 390854908 play videos.  Each record is about appid / userid / starttime(unixtimestamp in ms) / endtime / accumulated jittertime in this play session(ms).
+Users of app 390854908 play videos.  Each record contains these fields:
+
+1.  appid
+2. userid
+3. starttime(unixtimestamp in ms)
+4. endtime
+5. accumulated jittertime in this play session(ms).
 
 We need to analyze :this app, what is the jitter rate for each day ?
 
 
 
-1、python script used to create original data:
+1、python script used to create original data randomly:
 
 ```python
 #!/usr/bin/python3

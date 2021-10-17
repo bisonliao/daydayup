@@ -12,7 +12,6 @@
 
 static int get_next_file_index(const char * path)
 {
-   #if 0
     int i;
     for (i = 0; i< 1000000; ++i)
     {
@@ -23,25 +22,12 @@ static int get_next_file_index(const char * path)
         {
             continue;
         }
+	else
+	{
+            break;
+	}
     }
     return i;
-    #else
-    int i;
-    for (i = 0; i< 1000000; ++i)
-    {
-        char filename[1024];
-        snprintf(filename, sizeof(filename), "%s/sstable_%d", path, i);
-        printf("test file %s\n", filename);
-        int fd;
-        fd = open(filename, O_RDONLY);
-        if (fd < 0  )
-        {
-            break;
-        }
-        close(fd);
-    }
-    return i+1;
-    #endif
 }
 
 

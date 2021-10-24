@@ -23,22 +23,47 @@ int cmp(const skiplist_buffer_t *a, const skiplist_buffer_t *b)
 
 int main()
 {
+  
     memtable_handle_t handle;
-    memtable_init(&handle, 100000000, cmp);
+    memtable_init(&handle, 1000000000, cmp);
     int i;
     for (i = 0; i < 100000000; ++i)
     {
         
         int value = i + 1;
         skiplist_buffer_t score, data;
+        memset(&score, 0, sizeof(score));
+        memset(&data, 0, sizeof(data));
+
         skiplist_deep_copy_buffer2((const unsigned char *)&value, sizeof(value), &score);
         skiplist_deep_copy_buffer2((const unsigned char *)&value, sizeof(value), &data);
 
-        memtable_insert(&handle, score, &data); 
-        if ((i % 9973) == 7)
+        if (memtable_insert(&handle, score, &data))
         {
-            //sleep(1);
+            printf("failed to insert\n");
         }
+
+        if ( (i % 999997) == 7 && i > 1000000)
+        {
+            int value2 = value ;
+
+            skiplist_buffer_t score2, data2;
+            memset(&data2, 0, sizeof(data2));
+            memset(&score2, 0, sizeof(score2));
+            
+            skiplist_deep_copy_buffer2((const unsigned char *)&value2, sizeof(value2), &score2);
+            int iret = memtable_search(&handle, score2, &data2);
+            if (iret != 1 || *(int*)data2.ptr != value2 || data2.len != sizeof(int))
+            {
+                printf("search failed! %d, %d, %d\n", value2, iret, data2.len);
+            }
+            else
+            {
+                printf("search success!%d\n", value2);
+            }
+
+        }
+        
        
         skiplist_free_buffer(&score);
         skiplist_free_buffer(&data);
@@ -48,5 +73,6 @@ int main()
     {
         sleep(1);
     }
+  
     return 0;
 }

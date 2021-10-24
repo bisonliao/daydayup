@@ -1,4 +1,4 @@
-CFLAGS 		= -std=c99 -g  -I../skiplist 
+CFLAGS 		= -std=c99 -g  -I../skiplist  -D_BSD_SOURCE
 
 all: ../skiplist/skiplist.o main.o MemTable.o
 	gcc -o main.exe main.o MemTable.o ../skiplist/skiplist.o  -lpthread  

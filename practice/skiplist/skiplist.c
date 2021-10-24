@@ -33,7 +33,7 @@ void skiplist_release(skiplist_handle_t* handle)
     {
         skiplist_node_t *pnode = handle->header[i];
         skiplist_node_t *next = NULL;
-        if (pnode != NULL)
+        while (pnode != NULL)
         {
             if (pnode->data)
             {

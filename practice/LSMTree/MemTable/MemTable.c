@@ -8,20 +8,19 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
-
-#define SAVE_PATH "/data/SSTable0/"
+#include "SSTable.h"
 
 int memtable_switch_table(memtable_handle_t * handle);
 
 
-static int get_next_file_index(const char * path, int start)
+static int get_next_file_index(int start)
 {
  
     int i;
     for (i = start; i< 1000000; ++i)
     {
         char filename[1024];
-        snprintf(filename, sizeof(filename), "%s/sstable_%d.idx", path, i);
+        sstable_getfilename(filename, 0, i, 1, 0);
       
         if (access(filename, F_OK) == 0 )
         {
@@ -35,6 +34,7 @@ static int get_next_file_index(const char * path, int start)
     return i;
   
 }
+
 
 static int mutex_lock_timeout(pthread_mutex_t * m,  int millisecs)
 {
@@ -67,12 +67,21 @@ static int mutex_lock_timeout(pthread_mutex_t * m,  int millisecs)
 
 
 
-static int dump2file(skiplist_handle_t * list, const char * path, int fileIndexStart)
+static int dump2file(skiplist_handle_t * list,  int fileIndexStart)
 {
+    // dat file structure:
+    //  "sstable" + [score_len(4B) + score_value(?) + data_len(4B) + data_value(?)]
+    // idx file structure:
+    //  indexCnt(4B) + [score_len(4B) + score_value(?)+ offsetInDatFile(4B)] + IndexRangeInfo
+    //  IndexRangeInfo:
+    //  minScoreLen(4B) + minScoreData(?) + maxScoreLen(4B) + maxScoreData(?) + rangeInfoLen(4B) 
 #define BLOCK_SIZE (4*1024*1024)
 
     skiplist_node_t * pnode = list->header[0]->next;
     int fileindex = fileIndexStart;
+    skiplist_buffer_t minScore, maxScore;
+    memset(&minScore, 0, sizeof(minScore));
+    memset(&maxScore, 0, sizeof(maxScore));
 
 // two huge block used for batch writting, they are important for efficiency
     static unsigned char index[BLOCK_SIZE];
@@ -81,7 +90,8 @@ static int dump2file(skiplist_handle_t * list, const char * path, int fileIndexS
     int dataOffsetInBlock = 0;
     char filename[1024];
 
-    snprintf(filename, sizeof(filename), "%s/sstable_%d.idx.tmp", path, fileindex);
+    
+    sstable_getfilename(filename, 0, fileindex, 1, 1);
     int index_fd = open(filename, O_CREAT | O_RDWR | O_TRUNC, 0666 );
     if (index_fd < 0)
     {
@@ -89,7 +99,7 @@ static int dump2file(skiplist_handle_t * list, const char * path, int fileIndexS
         return -1;
     }
 
-    snprintf(filename, sizeof(filename), "%s/sstable_%d.dat.tmp", path, fileindex);
+    sstable_getfilename(filename, 0, fileindex, 0, 1);
     int data_fd = open(filename, O_CREAT | O_RDWR | O_TRUNC, 0666);
     if (data_fd < 0)
     {
@@ -100,9 +110,17 @@ static int dump2file(skiplist_handle_t * list, const char * path, int fileIndexS
     write(data_fd, "sstable", 7); // make the offset of the first record is not zero
     uint32_t offsetWritten = 7; // data written offset
 
+    uint32_t indexCnt = list->count;
+    indexCnt = htonl(indexCnt);
+    write(index_fd, &indexCnt, sizeof(indexCnt));
+
 
     while (pnode != NULL)
     {
+        if (pnode->score.len == 0) // the first node is just header, no valid score and data, ignore
+        {
+            continue;
+        }
 
         int oneRecordLen = pnode->score.len + pnode->data.len + 2 * sizeof(uint32_t);
         if (oneRecordLen > BLOCK_SIZE)
@@ -110,6 +128,8 @@ static int dump2file(skiplist_handle_t * list, const char * path, int fileIndexS
             close(index_fd);
             close(data_fd);
             printf("data of therecord is too big to save to file\n");
+            skiplist_free_buffer(&minScore);
+            skiplist_free_buffer(&maxScore);
             return -1;
         }
 
@@ -118,9 +138,21 @@ static int dump2file(skiplist_handle_t * list, const char * path, int fileIndexS
         {
             close(index_fd);
             close(data_fd);
+            skiplist_free_buffer(&minScore);
+            skiplist_free_buffer(&maxScore);
             printf("index of the record is too big to save to file\n");
             return -1;
         }
+        if (minScore.len == 0) // minScore has not been initialized, then save the first node into it
+        {
+            skiplist_deep_copy_buffer(&pnode->score, &minScore);
+        }
+        if (pnode->next == NULL)//skiplist is ordered, so save the last one as maxScore
+        {
+            skiplist_deep_copy_buffer(&pnode->score, &maxScore);
+        }
+        
+        
 
         if (oneRecordLen + dataOffsetInBlock > BLOCK_SIZE )//  a huge block almost full, then write
         {
@@ -168,17 +200,43 @@ static int dump2file(skiplist_handle_t * list, const char * path, int fileIndexS
         write(index_fd, index, indexOffsetInBlock);
         indexOffsetInBlock = 0;
     }
-     
+    //write range start:
+    uint32_t rangeLen = 0;
+    indexOffsetInBlock = 0;
+    *(uint32_t *)(index + indexOffsetInBlock) = htonl(minScore.len);
+    indexOffsetInBlock += sizeof(uint32_t);
+    rangeLen += sizeof(uint32_t);
+    memcpy(index + indexOffsetInBlock, minScore.ptr, minScore.len);
+    indexOffsetInBlock += minScore.len;
+    rangeLen += minScore.len;
+    write(index_fd, index, indexOffsetInBlock);
+
+    indexOffsetInBlock = 0;
+    *(uint32_t *)(index + indexOffsetInBlock) = htonl(maxScore.len);
+    indexOffsetInBlock += sizeof(uint32_t);
+    rangeLen += sizeof(uint32_t);
+    memcpy(index + indexOffsetInBlock, maxScore.ptr, maxScore.len);
+    indexOffsetInBlock += maxScore.len;
+    rangeLen += maxScore.len;
+    write(index_fd, index, indexOffsetInBlock);
+
+    rangeLen += sizeof(uint32_t);
+    rangeLen = htonl(rangeLen);
+    write(index_fd, &rangeLen, sizeof(rangeLen));
+    //write range end.
 
     close(data_fd);
     close(index_fd);
 
+    skiplist_free_buffer(&minScore);
+    skiplist_free_buffer(&maxScore);
+
     char newfilename[1024];
-    snprintf(filename, sizeof(filename), "%s/sstable_%d.idx.tmp", path, fileindex);
-    snprintf(newfilename, sizeof(filename), "%s/sstable_%d.idx", path, fileindex);
+    sstable_getfilename(filename, 0, fileindex, 1, 1);
+    sstable_getfilename(newfilename, 0, fileindex, 1, 0);
     rename(filename, newfilename);
-    snprintf(filename, sizeof(filename), "%s/sstable_%d.dat.tmp", path, fileindex);
-    snprintf(newfilename, sizeof(filename), "%s/sstable_%d.dat", path, fileindex);
+    sstable_getfilename(filename, 0, fileindex, 0, 1);
+    sstable_getfilename(newfilename, 0, fileindex, 0, 0);
     rename(filename, newfilename);
 
     return 0;
@@ -211,8 +269,8 @@ static void * dump(void * arg)
          
          //dump starts
         //printf("we dump it into file...\n");
-        fileIndexStart = get_next_file_index(SAVE_PATH, fileIndexStart);
-        dump2file((skiplist_handle_t*)handle->immuTable, SAVE_PATH, fileIndexStart);
+        fileIndexStart = get_next_file_index( fileIndexStart);
+        dump2file((skiplist_handle_t*)handle->immuTable,  fileIndexStart);
 
         // dump has been finished
         skiplist_release((skiplist_handle_t*)handle->immuTable);
@@ -271,8 +329,8 @@ int memtable_release(memtable_handle_t * handle)
 
     if (handle->immuTable) 
     {
-        int fileIndexStart = get_next_file_index(SAVE_PATH, 0);
-        dump2file((skiplist_handle_t*)handle->immuTable, SAVE_PATH, fileIndexStart);
+        int fileIndexStart = get_next_file_index( 0);
+        dump2file((skiplist_handle_t*)handle->immuTable, fileIndexStart);
 
         skiplist_release((skiplist_handle_t*)handle->immuTable);
         free((skiplist_handle_t*)handle->immuTable);
@@ -280,8 +338,8 @@ int memtable_release(memtable_handle_t * handle)
     }
 
     if (handle->activeTable) {
-        int fileIndexStart = get_next_file_index(SAVE_PATH, 0);
-        dump2file(handle->activeTable, SAVE_PATH, fileIndexStart);
+        int fileIndexStart = get_next_file_index( 0);
+        dump2file(handle->activeTable,  fileIndexStart);
 
         skiplist_release(handle->activeTable);
         free(handle->activeTable);

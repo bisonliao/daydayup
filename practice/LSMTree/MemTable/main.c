@@ -1,4 +1,5 @@
 #include "MemTable.h"
+#include "SSTable.h"
 
 int cmp(const skiplist_buffer_t *a, const skiplist_buffer_t *b)
 {
@@ -23,7 +24,7 @@ int cmp(const skiplist_buffer_t *a, const skiplist_buffer_t *b)
 
 int main()
 {
-  
+  #if 0
     memtable_handle_t handle;
     memtable_init(&handle, 1000000000, cmp);
     int i;
@@ -73,6 +74,20 @@ int main()
     {
         sleep(1);
     }
+    #else
+
+    //sstable_printIdxFile("/data/SSTable0/sstable_000000000.idx");
+    merged_file_t files[100];
+    int maxNum = 100;
+    sstable_score_cmp = cmp;
+    sstable_getAllMergedFiles(0, files, &maxNum);
+    int i;
+    for (i = 0; i < maxNum; ++i)
+    {
+        printf("[%s][%d][%d]\n", files[i].filename, *(int*)(files[i].beginScore.ptr), *(int*)(files[i].endScore.ptr));
+    }
+
+    #endif
   
     return 0;
 }

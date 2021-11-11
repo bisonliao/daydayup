@@ -9,31 +9,12 @@
 #include <stdio.h>
 #include <unistd.h>
 #include "SSTable.h"
+#include "../skiplist/skiplist.h"
 
 int memtable_switch_table(memtable_handle_t * handle);
 
 
-static int get_next_file_index(int start)
-{
- 
-    int i;
-    for (i = start; i< 1000000; ++i)
-    {
-        char filename[1024];
-        sstable_getfilename(filename, 0, i, 1, 0);
-      
-        if (access(filename, F_OK) == 0 )
-        {
-            continue;
-        }
-        else
-        {
-            break;
-        }
-    }
-    return i;
-  
-}
+
 
 
 static int mutex_lock_timeout(pthread_mutex_t * m,  int millisecs)
@@ -75,169 +56,16 @@ static int dump2file(skiplist_handle_t * list,  int fileIndexStart)
     //  indexCnt(4B) + [score_len(4B) + score_value(?)+ offsetInDatFile(4B)] + IndexRangeInfo
     //  IndexRangeInfo:
     //  minScoreLen(4B) + minScoreData(?) + maxScoreLen(4B) + maxScoreData(?) + rangeInfoLen(4B) 
-#define BLOCK_SIZE (4*1024*1024)
 
+    ssfile_ctx ssfile;
+    ssfile_init(&ssfile, 0, fileIndexStart, O_APPEND);
     skiplist_node_t * pnode = list->header[0]->next;
-    int fileindex = fileIndexStart;
-    skiplist_buffer_t minScore, maxScore;
-    memset(&minScore, 0, sizeof(minScore));
-    memset(&maxScore, 0, sizeof(maxScore));
-
-// two huge block used for batch writting, they are important for efficiency
-    static unsigned char index[BLOCK_SIZE];
-    static unsigned char data[BLOCK_SIZE];
-    int indexOffsetInBlock = 0;
-    int dataOffsetInBlock = 0;
-    char filename[1024];
-
-    
-    sstable_getfilename(filename, 0, fileindex, 1, 1);
-    int index_fd = open(filename, O_CREAT | O_RDWR | O_TRUNC, 0666 );
-    if (index_fd < 0)
-    {
-        perror("open index file in memtable_dump!");
-        return -1;
-    }
-
-    sstable_getfilename(filename, 0, fileindex, 0, 1);
-    int data_fd = open(filename, O_CREAT | O_RDWR | O_TRUNC, 0666);
-    if (data_fd < 0)
-    {
-        perror("open data file in memtable_dump!");
-        return -1;
-    }
-
-    write(data_fd, "sstable", 7); // make the offset of the first record is not zero
-    uint32_t offsetWritten = 7; // data written offset
-
-    uint32_t indexCnt = list->count;
-    indexCnt = htonl(indexCnt);
-    write(index_fd, &indexCnt, sizeof(indexCnt));
-
-
     while (pnode != NULL)
     {
-        if (pnode->score.len == 0) // the first node is just header, no valid score and data, ignore
-        {
-            continue;
-        }
-
-        int oneRecordLen = pnode->score.len + pnode->data.len + 2 * sizeof(uint32_t);
-        if (oneRecordLen > BLOCK_SIZE)
-        {
-            close(index_fd);
-            close(data_fd);
-            printf("data of therecord is too big to save to file\n");
-            skiplist_free_buffer(&minScore);
-            skiplist_free_buffer(&maxScore);
-            return -1;
-        }
-
-        int oneIndexLen = pnode->score.len + sizeof(uint32_t) + sizeof(uint32_t);
-        if (oneIndexLen > BLOCK_SIZE) 
-        {
-            close(index_fd);
-            close(data_fd);
-            skiplist_free_buffer(&minScore);
-            skiplist_free_buffer(&maxScore);
-            printf("index of the record is too big to save to file\n");
-            return -1;
-        }
-        if (minScore.len == 0) // minScore has not been initialized, then save the first node into it
-        {
-            skiplist_deep_copy_buffer(&pnode->score, &minScore);
-        }
-        if (pnode->next == NULL)//skiplist is ordered, so save the last one as maxScore
-        {
-            skiplist_deep_copy_buffer(&pnode->score, &maxScore);
-        }
-        
-        
-
-        if (oneRecordLen + dataOffsetInBlock > BLOCK_SIZE )//  a huge block almost full, then write
-        {
-            write(data_fd, data, dataOffsetInBlock);
-            offsetWritten += dataOffsetInBlock;
-            dataOffsetInBlock = 0;
-            continue;
-        }
-        if (oneIndexLen + indexOffsetInBlock > BLOCK_SIZE) //  a huge block almost full, then write
-        {
-            write(index_fd, index, indexOffsetInBlock);
-            indexOffsetInBlock = 0;
-            continue;
-        }
-        
-        // index
-        *(uint32_t *)(index + indexOffsetInBlock) = htonl(pnode->score.len);
-        indexOffsetInBlock += sizeof(uint32_t);
-        memcpy(index + indexOffsetInBlock, pnode->score.ptr, pnode->score.len);
-        indexOffsetInBlock += pnode->score.len;
-        *(uint32_t *)(index + indexOffsetInBlock) = htonl(offsetWritten+dataOffsetInBlock);
-        indexOffsetInBlock += sizeof(uint32_t);
-
-        // data
-        *(uint32_t *)(data + dataOffsetInBlock) = htonl(pnode->score.len);
-        dataOffsetInBlock += sizeof(uint32_t);
-        memcpy(data + dataOffsetInBlock, pnode->score.ptr, pnode->score.len);
-        dataOffsetInBlock += pnode->score.len;
-
-        *(uint32_t *)(data + dataOffsetInBlock) = htonl(pnode->data.len);
-        dataOffsetInBlock += sizeof(uint32_t);
-        memcpy(data + dataOffsetInBlock, pnode->data.ptr, pnode->data.len);
-        dataOffsetInBlock += pnode->data.len;
-
+        ssfile_append(&ssfile, &pnode->score, &pnode->data);
         pnode = pnode->next;
     }
-    if (dataOffsetInBlock > 0)
-    {
-        write(data_fd, data, dataOffsetInBlock);
-        offsetWritten += dataOffsetInBlock;
-        dataOffsetInBlock = 0;
-    }
-    if (indexOffsetInBlock > 0)
-    {
-        write(index_fd, index, indexOffsetInBlock);
-        indexOffsetInBlock = 0;
-    }
-    //write range start:
-    uint32_t rangeLen = 0;
-    indexOffsetInBlock = 0;
-    *(uint32_t *)(index + indexOffsetInBlock) = htonl(minScore.len);
-    indexOffsetInBlock += sizeof(uint32_t);
-    rangeLen += sizeof(uint32_t);
-    memcpy(index + indexOffsetInBlock, minScore.ptr, minScore.len);
-    indexOffsetInBlock += minScore.len;
-    rangeLen += minScore.len;
-    write(index_fd, index, indexOffsetInBlock);
-
-    indexOffsetInBlock = 0;
-    *(uint32_t *)(index + indexOffsetInBlock) = htonl(maxScore.len);
-    indexOffsetInBlock += sizeof(uint32_t);
-    rangeLen += sizeof(uint32_t);
-    memcpy(index + indexOffsetInBlock, maxScore.ptr, maxScore.len);
-    indexOffsetInBlock += maxScore.len;
-    rangeLen += maxScore.len;
-    write(index_fd, index, indexOffsetInBlock);
-
-    rangeLen += sizeof(uint32_t);
-    rangeLen = htonl(rangeLen);
-    write(index_fd, &rangeLen, sizeof(rangeLen));
-    //write range end.
-
-    close(data_fd);
-    close(index_fd);
-
-    skiplist_free_buffer(&minScore);
-    skiplist_free_buffer(&maxScore);
-
-    char newfilename[1024];
-    sstable_getfilename(filename, 0, fileindex, 1, 1);
-    sstable_getfilename(newfilename, 0, fileindex, 1, 0);
-    rename(filename, newfilename);
-    sstable_getfilename(filename, 0, fileindex, 0, 1);
-    sstable_getfilename(newfilename, 0, fileindex, 0, 0);
-    rename(filename, newfilename);
+    ssfile_final(&ssfile, 1);
 
     return 0;
 
@@ -269,7 +97,7 @@ static void * dump(void * arg)
          
          //dump starts
         //printf("we dump it into file...\n");
-        fileIndexStart = get_next_file_index( fileIndexStart);
+        fileIndexStart = sstable_getNextFileIndex(0, fileIndexStart);
         dump2file((skiplist_handle_t*)handle->immuTable,  fileIndexStart);
 
         // dump has been finished
@@ -329,7 +157,7 @@ int memtable_release(memtable_handle_t * handle)
 
     if (handle->immuTable) 
     {
-        int fileIndexStart = get_next_file_index( 0);
+        int fileIndexStart = sstable_getNextFileIndex(0, 0);
         dump2file((skiplist_handle_t*)handle->immuTable, fileIndexStart);
 
         skiplist_release((skiplist_handle_t*)handle->immuTable);
@@ -338,7 +166,7 @@ int memtable_release(memtable_handle_t * handle)
     }
 
     if (handle->activeTable) {
-        int fileIndexStart = get_next_file_index( 0);
+        int fileIndexStart = sstable_getNextFileIndex(0, 0);
         dump2file(handle->activeTable,  fileIndexStart);
 
         skiplist_release(handle->activeTable);

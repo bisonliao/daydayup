@@ -1,5 +1,6 @@
 #include "MemTable.h"
 #include "SSTable.h"
+#include "../skiplist/skiplist.h"
 
 int cmp(const skiplist_buffer_t *a, const skiplist_buffer_t *b)
 {
@@ -24,68 +25,67 @@ int cmp(const skiplist_buffer_t *a, const skiplist_buffer_t *b)
 
 int main()
 {
+    sstable_score_cmp = cmp;
+
   #if 0
     memtable_handle_t handle;
+   
     memtable_init(&handle, 1000000000, cmp);
     int i;
-    for (i = 0; i < 100000000; ++i)
+    for (i = 0; i < 10000000; ++i)
     {
         
         int value = i + 1;
+        int iret;
         skiplist_buffer_t score, data;
         memset(&score, 0, sizeof(score));
         memset(&data, 0, sizeof(data));
 
         skiplist_deep_copy_buffer2((const unsigned char *)&value, sizeof(value), &score);
+        value = value*5;
         skiplist_deep_copy_buffer2((const unsigned char *)&value, sizeof(value), &data);
 
-        if (memtable_insert(&handle, score, &data))
+        if (iret = memtable_insert(&handle, score, &data))
         {
-            printf("failed to insert\n");
-        }
-
-        if ( (i % 999997) == 7 && i > 1000000)
-        {
-            int value2 = value ;
-
-            skiplist_buffer_t score2, data2;
-            memset(&data2, 0, sizeof(data2));
-            memset(&score2, 0, sizeof(score2));
-            
-            skiplist_deep_copy_buffer2((const unsigned char *)&value2, sizeof(value2), &score2);
-            int iret = memtable_search(&handle, score2, &data2);
-            if (iret != 1 || *(int*)data2.ptr != value2 || data2.len != sizeof(int))
-            {
-                printf("search failed! %d, %d, %d\n", value2, iret, data2.len);
-            }
-            else
-            {
-                printf("search success!%d\n", value2);
-            }
-
+            printf("failed to insert, %d\n", iret);
         }
         
+
+       
        
         skiplist_free_buffer(&score);
         skiplist_free_buffer(&data);
          
     }
+    printf("\n");
     while (1)
     {
         sleep(1);
     }
     #else
-
-    //sstable_printIdxFile("/data/SSTable0/sstable_000000000.idx");
-    merged_file_t files[100];
-    int maxNum = 100;
-    sstable_score_cmp = cmp;
-    sstable_getAllMergedFiles(0, files, &maxNum);
-    int i;
-    for (i = 0; i < maxNum; ++i)
+    
+    
+    ssfile_ctx ssfile;
+    ssfile_init(&ssfile, 1, 0, O_RDONLY);
+   
+    while (1)
     {
-        printf("[%s][%d][%d]\n", files[i].filename, *(int*)(files[i].beginScore.ptr), *(int*)(files[i].endScore.ptr));
+        skiplist_buffer_t score, data;
+        int iret = ssfile_read(&ssfile, &score, &data);
+        if (iret == 0)
+        {
+            break;
+        }
+        printf("%d, %d, %d, %d\n", score.len, *(int*)score.ptr, data.len, *(int*)data.ptr);
+        skiplist_free_buffer(&score);
+        skiplist_free_buffer(&data);
+
     }
+    ssfile_final(&ssfile, 0);
+    
+  
+   
+    //fileMerge("sstable_000000001", 1);
 
     #endif
   

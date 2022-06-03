@@ -21,7 +21,7 @@ double doubleAbs(double d);
 
 int centroid_init(centroid_handle_t * c);
 int centroid_addElement(centroid_handle_t * c, double ele);
-int centroid_split(centroid_handle_t * a, centroid_handle_t * b, centroid_handle_t * c, double r);
+int centroid_split(centroid_handle_t * a, centroid_handle_t * b, centroid_handle_t * c);
 
 
 #endif

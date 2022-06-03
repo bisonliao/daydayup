@@ -66,7 +66,7 @@ static int tdigest_getCluster(tdigest_handle_t * t, double ele)
     return oldIndex;
 
 }
-
+/*
 static double tdigest_calcRadius(tdigest_handle_t * t, int index)
 {
     if (index == 0)
@@ -109,6 +109,7 @@ static double tdigest_calcRadius(tdigest_handle_t * t, int index)
         return  a > b ? b:a;
     }
 }
+*/
 
 int tdigest_update(tdigest_handle_t * t, double ele)
 {
@@ -169,9 +170,8 @@ int tdigest_update(tdigest_handle_t * t, double ele)
         if (c == NULL) {fprintf(stderr, "%s %d: malloc failed!\n", __FILE__, __LINE__); free(b); return -2;}
         centroid_init(c);
 
-        //double radius = tdigest_calcRadius(t, centroidIndex);
 
-        ret = centroid_split(a, b, c, 0);
+        ret = centroid_split(a, b, c);
         if (ret != 0)
         {
             fprintf(stderr, "%s %d: centroid_split failed!\n", __FILE__, __LINE__); 

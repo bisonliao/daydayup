@@ -33,7 +33,7 @@ int centroid_addElement(centroid_handle_t * c, double ele)
     return 0;
 }
 
-int centroid_split(centroid_handle_t * a, centroid_handle_t * b, centroid_handle_t * c, double r)
+int centroid_split(centroid_handle_t * a, centroid_handle_t * b, centroid_handle_t * c)
 {
     if (a == NULL || b == NULL || c == NULL) { return -1;}
 

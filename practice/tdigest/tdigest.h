@@ -1,6 +1,10 @@
 #ifndef _BISON_TDIGEST_H_INCLUDED_
 #define _BISON_TDIGEST_H_INCLUDED_
 
+/*
+https://github.com/tdunning/t-digest
+*/
+
 #include "centroid.h"
 
 #if 1

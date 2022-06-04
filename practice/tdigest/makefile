@@ -1,4 +1,4 @@
-CFLAGS 		= -g
+CFLAGS 		= -pg
 
 ttx:tdigest.o centroid.o
 	gcc $(CFLAGS) -o $@ $^ 

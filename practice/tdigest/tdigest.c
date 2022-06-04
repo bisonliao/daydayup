@@ -1,4 +1,5 @@
 #include "tdigest.h"
+#include <time.h>
 
 int tdigest_init(tdigest_handle_t * t, double min, double max)
 {
@@ -42,7 +43,7 @@ int tdigest_init(tdigest_handle_t * t, double min, double max)
 
 static int tdigest_getCluster(tdigest_handle_t * t, double ele)
 {
-    // search by bruce force
+    // search by bruce force, it costs too much cpu from gprof analysis
     // maybe we can optimize it by KD tree or Ball Tree
     if (t->centroidNum < 1) { return -1;}
     int i;
@@ -66,50 +67,7 @@ static int tdigest_getCluster(tdigest_handle_t * t, double ele)
     return oldIndex;
 
 }
-/*
-static double tdigest_calcRadius(tdigest_handle_t * t, int index)
-{
-    if (index == 0)
-    {
-        double distance = t->centroidList[index+1]->centroidCenter - t->centroidList[index]->centroidCenter;
-        if (distance < 0) { fprintf(stderr, "%s %d: assert failed!\n", __FILE__, __LINE__); exit(-1);}
-        uint32_t sum = t->centroidList[index+1]->eleNum + t->centroidList[index]->eleNum;
-        if (sum == 0) { fprintf(stderr, "%s %d: assert failed!\n", __FILE__, __LINE__); exit(-1);}
 
-        return t->centroidList[index]->eleNum * (t->centroidList[index]->eleNum / distance);
-    }
-    else if (index == t->centroidNum-1)
-    {
-        double distance = t->centroidList[index]->centroidCenter - t->centroidList[index-1]->centroidCenter;
-        if (distance < 0) { fprintf(stderr, "%s %d: assert failed!\n", __FILE__, __LINE__); exit(-1);}
-        uint32_t sum = t->centroidList[index-1]->eleNum + t->centroidList[index]->eleNum;
-        if (sum == 0) { fprintf(stderr, "%s %d: assert failed!\n", __FILE__, __LINE__); exit(-1);}
-
-        return t->centroidList[index]->eleNum * (t->centroidList[index]->eleNum / distance);
-    }
-    else
-    {
-        double distance;
-        uint32_t sum;
-
-        distance = t->centroidList[index+1]->centroidCenter - t->centroidList[index]->centroidCenter;
-        if (distance < 0) { fprintf(stderr, "%s %d: assert failed!\n", __FILE__, __LINE__); exit(-1);}
-        sum = t->centroidList[index+1]->eleNum + t->centroidList[index]->eleNum;
-        if (sum == 0) { fprintf(stderr, "%s %d: assert failed!\n", __FILE__, __LINE__); exit(-1);}
-
-        double a =  t->centroidList[index]->eleNum * (t->centroidList[index]->eleNum / distance);
-
-        distance = t->centroidList[index]->centroidCenter - t->centroidList[index-1]->centroidCenter;
-        if (distance < 0) { fprintf(stderr, "%s %d: assert failed!\n", __FILE__, __LINE__); exit(-1);}
-        sum = t->centroidList[index-1]->eleNum + t->centroidList[index]->eleNum;
-        if (sum == 0) { fprintf(stderr, "%s %d: assert failed!\n", __FILE__, __LINE__); exit(-1);}
-
-        double b =  t->centroidList[index]->eleNum * (t->centroidList[index]->eleNum / distance);
-
-        return  a > b ? b:a;
-    }
-}
-*/
 
 int tdigest_update(tdigest_handle_t * t, double ele)
 {
@@ -124,6 +82,7 @@ int tdigest_update(tdigest_handle_t * t, double ele)
     }
     t->eleTotalNum++;
 
+    // if the centroid centers are NOT sequen, swap to keep them ordered
     int i;
     int swapflag = 0;
     
@@ -154,9 +113,9 @@ int tdigest_update(tdigest_handle_t * t, double ele)
         //fprintf(stdout, "%s %d:swap\n", __FILE__, __LINE__);
     }
     if (swapflag) { centroidIndex = i;}
-
+#if 1
     // if the centroid has too many elements, then split it and insert into the list;
-    if (t->centroidList[centroidIndex]->eleNum > 10 &&
+    if (t->centroidList[centroidIndex]->eleNum > 10000 &&
         t->centroidList[centroidIndex]->eleNum > (t->eleTotalNum / t->centroidNum * 5) &&
         t->centroidNum < MAX_CENTROID_NUM)
     {
@@ -190,9 +149,8 @@ int tdigest_update(tdigest_handle_t * t, double ele)
         t->centroidList[centroidIndex+1] = c;
         t->centroidNum++;
         free(a);
-
-    
     }
+#endif
     return 0;
         
 }
@@ -256,8 +214,38 @@ int compareDouble(const void * a, const void * b)
 
 int main(int argc, char ** argv)
 {
-	// wo cao, tdigest by me is very slow than qsort
-    srandom(time());
+    // wo cao, tdigest implemented by bison is much slower than qsort.
+    // gprof shows:clustering costs too much cpu.
+    /*
+                Call graph (explanation follows)
+
+
+granularity: each sample hit covers 2 byte(s) for 0.00% of 243.17 seconds
+
+index % time    self  children    called     name
+                                                 <spontaneous>
+[1]    100.0    0.98  242.18                 main [1]
+                2.33  239.83 100000000/100000000     tdigest_update [2]
+                0.02    0.01       1/1           tdigest_init [7]
+                0.00    0.00       4/4           tdigest_getPercentile [9]
+                0.00    0.00       1/1           tdigest_free [10]
+-----------------------------------------------
+                2.33  239.83 100000000/100000000     main [1]
+[2]     99.6    2.33  239.83 100000000         tdigest_update [2]
+              144.49   79.39 100000000/100000000     tdigest_getCluster [3]
+                1.11   14.76 100000000/100000000     centroid_addElement [5]
+                0.09    0.00      39/39          centroid_split [6]
+                0.00    0.00      78/1078        centroid_init [8]
+-----------------------------------------------
+              144.49   79.39 100000000/100000000     tdigest_update [2]
+[3]     92.1  144.49   79.39 100000000         tdigest_getCluster [3]
+               79.39    0.00 537906649/637906649     doubleAbs [4]
+-----------------------------------------------
+               14.76    0.00 100000000/637906649     centroid_addElement [5]
+               79.39    0.00 537906649/637906649     tdigest_getCluster [3]
+[4]     38.7   94.14    0.00 637906649         doubleAbs [4]
+*/
+    srandom(time(NULL));
     if (argc < 2)
     {
         printf("use tdigest...\n");

@@ -245,26 +245,50 @@ int tdigest_free(tdigest_handle_t * t)
     t->min = 0;
     t->max = 0;
 }
-
-int main()
+int compareDouble(const void * a, const void * b)
 {
-    tdigest_handle_t handle;
-    tdigest_init(&handle, 0, 1000);
-    for (int i = 0; i < 1000000; ++i)
+    double aa = *(double*)a;
+    double bb = *(double*)b;
+    if (aa < bb) return -1;
+    if (aa == bb) return 0;
+    if (aa > bb) return 1;
+}
+
+int main(int argc, char ** argv)
+{
+	// wo cao, tdigest by me is very slow than qsort
+    srandom(time());
+    if (argc < 2)
     {
-        double ele = ((double)random()) / RAND_MAX * 1000;
-        tdigest_update(&handle, ele);
+        printf("use tdigest...\n");
+        tdigest_handle_t handle;
+        tdigest_init(&handle, 0, 10000);
+        for (int i = 0; i < 100000000; ++i)
+        {
+            double ele = ((double)random()) / RAND_MAX * 10000;
+            tdigest_update(&handle, ele);
+            
+        }
+        //tdigest_print(&handle);
+
+        double v;
         
+        tdigest_getPercentile(&handle, 5, &v);printf("%f\n", v);
+        tdigest_getPercentile(&handle, 50, &v);printf("%f\n", v);
+        tdigest_getPercentile(&handle, 90, &v);printf("%f\n", v);
+        tdigest_getPercentile(&handle, 95, &v);printf("%f\n", v);
+
+        tdigest_free(&handle);
+        return 0;
     }
-    tdigest_print(&handle);
+    printf("use qsort...\n");
+    double *arr = malloc(100000000*sizeof(double));
+    for (int i = 0; i < 100000000; ++i)
+    {
+        double ele = ((double)random()) / RAND_MAX * 10000;
+        arr[i] = ele;
+    }
+    qsort(arr, 100000000, sizeof(double), compareDouble);
+    printf("%f, %f, %f, %f\n", arr[5000000], arr[50000000], arr[90000000], arr[95000000]);
 
-    double v;
-    
-    tdigest_getPercentile(&handle, 5, &v);printf("%f\n", v);
-    tdigest_getPercentile(&handle, 50, &v);printf("%f\n", v);
-    tdigest_getPercentile(&handle, 90, &v);printf("%f\n", v);
-    tdigest_getPercentile(&handle, 95, &v);printf("%f\n", v);
-
-    tdigest_free(&handle);
-    return 0;
 }

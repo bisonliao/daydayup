@@ -1,9 +1,9 @@
-CFLAGS 		= -pg
+CFLAGS 		= -g
 
-ttx:tdigest.o centroid.o
+ttx:tdigest2.o centroid.o
 	gcc $(CFLAGS) -o $@ $^ 
 
-tdigest.o:tdigest.c
+tdigest2.o:tdigest2.c
 	gcc $(CFLAGS) -c -o $@ $^
 
 centroid.o:centroid.c

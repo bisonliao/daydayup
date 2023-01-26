@@ -1,5 +1,4 @@
 #include "BigDecimal.h"
-
 extern "C" {
 #include <string.h>
 }

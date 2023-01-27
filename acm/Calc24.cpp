@@ -341,7 +341,7 @@ int findSolutions(vector<operand_t> & numbers)
         int i,m;
         for (i = 0; i < 4; ++i)
         {
-            for (m = 0; m < 4; ++m)
+            for (m = i+1; m < 4; ++m)// 如果写作for (m=0;m<4;++m)会有重复
             {
                 if (i == m)
                 {
@@ -397,21 +397,20 @@ int printSolutions()
     suc.isOriginal = false;
     suc.val =SUC_RESULT;
 
-    resultAtMiddle.push_back(suc);   
+    resultAtMiddle.push_front(suc);   
     
 
     while (resultAtMiddle.size() > 0)
     {
         operand_t res = resultAtMiddle.at(0);
         resultAtMiddle.pop_front();
+
         it = g_stepsSave.find(res.val);
         if (it == g_stepsSave.end())
         {
             printf("can NOT find solution\n");
             return -1;
         }
-        //printf("res=%d\n",res);
-
         const set<step_t> &steps = it->second;
         set<step_t>::const_iterator it2;
         for (it2 = steps.begin(); it2 != steps.end(); it2++)
@@ -426,9 +425,10 @@ int printSolutions()
             {
                 continue;
             }
-            printf("%d=%d%s %s %d%s\n", res.val, step.left.val, original(step.left).c_str(),
+            printf("%d[%ld]=%d[%ld]%s %s %d[%ld]%s\n", res.val, res.id,
+                    step.left.val, step.left.id, original(step.left).c_str(),
                    op2str(step.op).c_str(),
-                   step.right.val, original(step.right).c_str());
+                   step.right.val, step.right.id, original(step.right).c_str());
             it++;
             bool bottom = true;
             if (!step.left.isOriginal)
@@ -471,6 +471,7 @@ int main()
     cleanStepsSave();
     findSolutions(numbers);
     printSolutions();
+
     return 0;
 }
 

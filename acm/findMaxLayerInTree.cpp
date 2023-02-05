@@ -62,6 +62,25 @@ node_t * buildTree(const vector<string> & elements)
     }
     return root;
 }
+int freeTree(node_t * & root)
+{
+
+    deque<const node_t*> nodes;
+    nodes.push_back(root);
+    while (nodes.size() > 0)
+    {
+        const node_t * p = nodes[0];
+        nodes.pop_front();
+
+       
+        if (p->left)  nodes.push_back(p->left);
+        if (p->right) nodes.push_back(p->right);
+        delete p;
+
+    }
+    root = NULL;
+    return 0;
+}
 int printTree(const node_t * root)
 {
     printf("[");

@@ -47,6 +47,32 @@ int32_t prepare(const vector<int32_t> &array) // 预处理，建立索引
     }
     return 0;
 }
+// 这个子数列找到了，写入快速去重的索引
+int found(const deque<int32_t>  & subArray)
+{
+    int k;
+    for (k = 0; k < subArray.size()-1; ++k)
+    {
+        int64_t a = subArray[k];
+        int64_t b = subArray[k+1];
+        int64_t toSave = (a << 32) | b;
+        g_hasFound.insert(toSave);
+    }
+    return 0;
+}
+//查找该子数列是否找到过
+bool hasAlreadyFound(const deque<int32_t>  & subArray)
+{
+    if (subArray.size() < 2) { return false;}
+    int64_t a = subArray[0];
+    int64_t b = subArray[1];
+    int64_t toSave = (a << 32) | b;
+    if (g_hasFound.find(toSave) != g_hasFound.end())
+    {
+        return true;
+    }
+    return false;
+}
 // 把元素array[i]和array[j]拓展成一个等差数列，并找出与array的交集，形成一个array的子数列，存放在subArray里
 int32_t checkSubArray(int32_t i, int32_t j, const vector<int32_t> &array, deque<int32_t> &subArray)
 {
@@ -55,6 +81,11 @@ int32_t checkSubArray(int32_t i, int32_t j, const vector<int32_t> &array, deque<
 
     subArray.push_back(array[i]);
     subArray.push_back(array[j]);
+
+    if (hasAlreadyFound(subArray))
+    {
+        return 0;
+    }
 
 
     while (i > 0)
@@ -107,32 +138,7 @@ int32_t checkSubArray(int32_t i, int32_t j, const vector<int32_t> &array, deque<
     return 0;
 
 }
-// 这个子数列找到了，写入快速去重的索引
-int found(const deque<int32_t>  & subArray)
-{
-    int k;
-    for (k = 0; k < subArray.size()-1; ++k)
-    {
-        int64_t a = subArray[k];
-        int64_t b = subArray[k+1];
-        int64_t toSave = (a << 32) | b;
-        g_hasFound.insert(toSave);
-    }
-    return 0;
-}
-//查找该子数列是否找到过
-bool hasAlreadyFound(const deque<int32_t>  & subArray)
-{
-    if (subArray.size() < 2) { return false;}
-    int64_t a = subArray[0];
-    int64_t b = subArray[1];
-    int64_t toSave = (a << 32) | b;
-    if (g_hasFound.find(toSave) != g_hasFound.end())
-    {
-        return true;
-    }
-    return false;
-}
+
 
 int32_t findSubArrayWithSameStep(const vector<int32_t> array, vector< deque<int32_t>> & result)
 {
@@ -145,7 +151,7 @@ int32_t findSubArrayWithSameStep(const vector<int32_t> array, vector< deque<int3
         {
             deque<int32_t> subArray;
             checkSubArray(i, j, array, subArray);
-            if (subArray.size() >= 3 && !hasAlreadyFound(subArray))
+            if (subArray.size() >= 3 )
             {
                 result.push_back(subArray);
                 found(subArray);

@@ -9,8 +9,8 @@ public class Main {
         Card a = poker.getCards().get(0);
         Card b = poker.getCards().get(1);
         Card c = poker.getCards().get(2);
-       // Card d = poker.getCards().get(3);
-       // Card e = poker.getCards().get(4);
-        poker.ThreeCardOnDest(a, b, c);
+        Card d = poker.getCards().get(3);
+        Card e = poker.getCards().get(4);
+        poker.FiveCardOnDest(a, b, c,d,e);
     }
 }

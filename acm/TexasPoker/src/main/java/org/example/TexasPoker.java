@@ -250,6 +250,8 @@ public class TexasPoker {
                 Card f = m_cards.get(i);
                 Card e = m_cards.get(j);
 
+                int maxCombination = -1;
+
 
                 int p;
                 for (p = 0; p < 6; ++p)
@@ -264,9 +266,14 @@ public class TexasPoker {
 
                     sixCards.remove(p);
                     int combination = JudgeCombination(sixCards);
-                    count[combination]++;
-                    totalNum++;
+                    if (combination > maxCombination)
+                    {
+                        maxCombination = combination;
+                    }
+
                 }
+                count[maxCombination]++;
+                totalNum++;
 
 
             }
@@ -320,6 +327,8 @@ public class TexasPoker {
                 Card f = m_cards.get(i);
                 Card g = m_cards.get(j);
 
+                int maxCombination = -1;
+
 
                 int p,q;
                 for (p = 0; p < 7; ++p)
@@ -346,8 +355,12 @@ public class TexasPoker {
 
                         sixCards.remove(q);
                         int combination = JudgeCombination(sixCards);
-                        count[combination]++;
-                        totalNum++;
+                        if (combination > maxCombination)
+                        {
+                            maxCombination = combination;
+                        }
+
+                        /*
                         if (combination > 1)
                         {
                             System.out.println("" + sixCards.get(0).getPoint() + "," + sixCards.get(0).getVariety());
@@ -359,9 +372,13 @@ public class TexasPoker {
 
                         }
 
+                         */
+
                     }
 
                 }
+                count[maxCombination]++;
+                totalNum++;
             }
         }
         if (totalNum == 0)

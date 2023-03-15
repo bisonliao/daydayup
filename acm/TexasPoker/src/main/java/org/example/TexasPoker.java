@@ -136,7 +136,8 @@ public class TexasPoker {
         }
         // 三条
         if (cards.get(0).getPoint() == cards.get(1).getPoint() &&  cards.get(1).getPoint() == cards.get(2).getPoint() ||
-                cards.get(3).getPoint() == cards.get(4).getPoint()  &&  cards.get(2).getPoint() == cards.get(3).getPoint())
+                cards.get(3).getPoint() == cards.get(4).getPoint()  &&  cards.get(2).getPoint() == cards.get(3).getPoint() ||
+                cards.get(1).getPoint() == cards.get(2).getPoint()  &&  cards.get(2).getPoint() == cards.get(3).getPoint())
         {
             return COMBINATION_THREE_OF_A_KIND;
         }

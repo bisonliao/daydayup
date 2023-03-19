@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+// 生成类的包名
+option java_package = "org.example";
+// 生成类的文件名，否则默认生成的类名为proto文件名的驼峰命名
+//option java_outer_classname = "HelloWorldProto";
+// 定义的所有消息、枚举和服务生成对应的多个类文件，而不是以内部类的形式出现
+option java_multiple_files = false;
+
+// when cmd = 1, send event
+message SendEvent {
+    int64 sequence = 1;
+    bytes event = 2;
+}
+// when cmd = 2, ack the event send
+message AckEvent {
+    int64 sequence = 1;
+}
+
+
+// 方法请求,包含用户名, 不同的cmd，body就对应上面不同的message
+message Request {
+  uint32 cmd = 1;
+  bytes body = 2;
+}
+

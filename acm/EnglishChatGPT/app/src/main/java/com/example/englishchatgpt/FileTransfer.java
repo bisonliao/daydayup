@@ -44,7 +44,7 @@ public class FileTransfer implements Runnable{
     @Override
     public void run() {
 
-        String url = "ws://119.28.214.71:7890";
+        String url = "ws://119.x.x.x:7890";
 
 
         try {

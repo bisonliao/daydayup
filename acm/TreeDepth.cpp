@@ -157,6 +157,62 @@ int getTreeDepth(Node * root)
     }
     return -2;
 }
+int freeTree(const Node * root)
+{
+    if (root == NULL) { return 0;}
+    const Node * p = root;
+    stack<const Node*> path;
+    while (true)
+    {
+        if (p->left != NULL) 
+        {          
+            path.push(p);
+            p = p->left;
+        }
+        else if (p->right != NULL)
+        {
+            path.push(p);
+            p = p ->right;
+        }
+        else // leaf node
+        { 
+
+        go_up:
+            if (path.empty())
+            {
+                if (p == root) { delete p; return 0;}
+                else { return -1;}      
+            }
+            const Node * parent = path.top();
+            path.pop();
+        
+            if (parent->left == p)
+            {
+                if (parent->right == NULL)
+                {
+                    delete p;
+                    p = parent;
+                    goto go_up;
+                }
+                else
+                {
+                    path.push(parent);
+                    delete p;
+                    p = parent->right;
+                } 
+            }
+            else if (parent->right == p)
+            {
+                delete p;
+                p = parent;
+                goto go_up;
+            }
+
+
+        }
+    }
+    return -2;
+}
 
 
 // Tests for getTreeDepth2 function
@@ -165,6 +221,7 @@ TEST(getTreeDepthTest2, EmptyTree)
     Node* root = NULL;
     int depth = getTreeDepth2(root);
     EXPECT_EQ(depth, 0);
+    freeTree(root);
 }
 
 TEST(getTreeDepthTest2, NonEmptyTree)
@@ -179,6 +236,7 @@ TEST(getTreeDepthTest2, NonEmptyTree)
 
     int depth = getTreeDepth2(root);
     EXPECT_EQ(depth, 3);
+    freeTree(root);
 }
 
 TEST(getTreeDepthTest2, SingleNodeTree)
@@ -186,6 +244,7 @@ TEST(getTreeDepthTest2, SingleNodeTree)
     Node* root = new Node(10);
     int depth = getTreeDepth2(root);
     EXPECT_EQ(depth, 1);
+    freeTree(root);
 }
 
 TEST(getTreeDepthTest2, LeftSkewedTree)
@@ -198,6 +257,7 @@ TEST(getTreeDepthTest2, LeftSkewedTree)
 
     int depth = getTreeDepth2(root);
     EXPECT_EQ(depth, 4);
+    freeTree(root);
 }
 
 TEST(getTreeDepthTest2, RightSkewedTree)
@@ -210,6 +270,7 @@ TEST(getTreeDepthTest2, RightSkewedTree)
 
     int depth = getTreeDepth2(root);
     EXPECT_EQ(depth, 4);
+    freeTree(root);
 }
 
 
@@ -231,6 +292,7 @@ TEST(getTreeDepthTest, FullTree)
     Node* root = createFullTree();
     int depth = getTreeDepth(root);
     EXPECT_EQ(depth, 3);
+    freeTree(root);
 }                         
 
 TEST(getTreeDepthTest, PositiveNos) { 
@@ -241,6 +303,7 @@ TEST(getTreeDepthTest, PositiveNos) {
     root->right->right = new Node(7);
 
     EXPECT_EQ(getTreeDepth(root), 3); 
+    freeTree(root);
 }
 
 TEST(getTreeDepthTest, NegativeNos) { 
@@ -249,8 +312,8 @@ TEST(getTreeDepthTest, NegativeNos) {
 
 TEST(getTreeDepthTest, OnlyRoot) { 
     Node* root = new Node(3);
-
     EXPECT_EQ(getTreeDepth(root), 1); 
+    freeTree(root);
 }
 
 TEST(getTreeDepthTest, OnlyLeft) { 
@@ -258,6 +321,7 @@ TEST(getTreeDepthTest, OnlyLeft) {
     root->left = new Node(9);
 
     EXPECT_EQ(getTreeDepth(root), 2); 
+    freeTree(root);
 }
 
 TEST(getTreeDepthTest, OnlyRight) { 
@@ -265,6 +329,7 @@ TEST(getTreeDepthTest, OnlyRight) {
     root->right = new Node(20);
 
     EXPECT_EQ(getTreeDepth(root), 2); 
+    freeTree(root);
 }
 
 TEST(getTreeDepthTest, LeftSkewedTree)
@@ -277,6 +342,7 @@ TEST(getTreeDepthTest, LeftSkewedTree)
 
     int depth = getTreeDepth(root);
     EXPECT_EQ(depth, 4);
+    freeTree(root);
 }
 
 TEST(getTreeDepthTest, RightSkewedTree)
@@ -289,6 +355,7 @@ TEST(getTreeDepthTest, RightSkewedTree)
 
     int depth = getTreeDepth(root);
     EXPECT_EQ(depth, 4);
+    freeTree(root);
 }
 
 
@@ -298,6 +365,7 @@ TEST(getTreeDepthTest, Unbalanced) {
     root->left->left = new Node(10);
 
     EXPECT_EQ(getTreeDepth(root), 3); 
+    freeTree(root);
 }
 
 int main(int argc, char **argv) {

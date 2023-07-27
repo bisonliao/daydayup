@@ -2,6 +2,7 @@
 * 写一个函数，返回二叉树的深度
 *  算法一：类似后续遍历
 *  算法二：把它按照左右关系打平放到数组里，检查数组的最后一个元素的下标范围可得出深度
+*  算法三：广度优先遍历，每次遍历，深度加1
 * g++ -ottx TreeDepth.cpp -I/usr/src/googletest/googlemock/include  -lgtest -lpthread
 */
 #include <stdlib.h>
@@ -20,6 +21,7 @@
 #include <stack>
 #include <queue>
 #include <cmath>
+
 using namespace std;
 
 
@@ -48,6 +50,35 @@ class Node
            depth = -1;
        }
 };
+// 算法三：广度优先遍历，每次遍历，深度加1
+int getTreeDepth3(Node * root)
+{
+    if (root == NULL) {return 0;}
+    deque<Node *> scanList;
+    root->depth = 1;
+    scanList.push_back(root);
+    int depth = -1;
+    while (!scanList.empty())
+    {
+        Node * p = scanList.front();
+        scanList.pop_front();
+        if (depth < p->depth) {depth = p->depth;}
+
+        if (p->left)
+        {
+            p->left->depth = p->depth + 1;
+            scanList.push_back(p->left);
+        }
+        if (p->right)
+        {
+            p->right->depth = p->depth + 1;
+            scanList.push_back(p->right);
+        }
+
+    }
+    return depth;
+
+}
 //算法二：把它按照左右关系打平放到数组里，检查数组的最后一个元素的下标范围可得出深度
 int getTreeDepth2(const Node * root)
 {
@@ -213,6 +244,62 @@ int freeTree(const Node * root)
     }
     return -2;
 }
+
+// Test fixture for Tree tests
+class TreeTest : public ::testing::Test
+{
+public:
+    // Helper function to create a binary tree with given values
+    static Node* createBinaryTree(const std::vector<int>& values, size_t index)
+    {
+        if (index >= values.size() || values[index] == -1) // -1 represents NULL node
+            return nullptr;
+
+        Node* root = new Node(values[index]);
+        root->left = createBinaryTree(values, 2 * index + 1);
+        root->right = createBinaryTree(values, 2 * index + 2);
+        return root;
+    }
+};
+
+// Test cases for getTreeDepth3 function
+TEST(getTreeDepth3, EmptyTree)
+{
+    // Test case for an empty tree (null root)
+    Node* root = nullptr;
+    int depth = getTreeDepth3(root);
+    EXPECT_EQ(depth, 0);
+}
+
+TEST(getTreeDepth3, SingleNodeTree)
+{
+    // Test case for a tree with only one node
+    Node* root = new Node(42);
+    int depth = getTreeDepth3(root);
+    EXPECT_EQ(depth, 1);
+    freeTree(root);
+}
+
+TEST(getTreeDepth3, FullBinaryTree)
+{
+    // Test case for a full binary tree with depth 3
+    std::vector<int> values = {1, 2, 3, 4, 5, 6, 7};
+    Node* root = TreeTest::createBinaryTree(values, 0);
+    int depth = getTreeDepth3(root);
+    EXPECT_EQ(depth, 3);
+    freeTree(root);
+}
+
+TEST(getTreeDepth3, SkewedTree)
+{
+    // Test case for a skewed binary tree with depth 4
+    std::vector<int> values = {1, -1, 2, -1,-1, -1, 3,-1,-1,-1,-1,-1,-1, -1, 4};
+    Node* root = TreeTest::createBinaryTree(values, 0);
+    int depth = getTreeDepth3(root);
+    EXPECT_EQ(depth, 4);
+    freeTree(root);
+}
+
 
 
 // Tests for getTreeDepth2 function

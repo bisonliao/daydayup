@@ -1,0 +1,161 @@
+<html>
+    <head>
+        <title>Test Environments Scheduler</title>
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.0/jquery.min.js"></script>
+        <script lang="javascript">
+            function updateScheduleList()
+            {
+                $.post("/queryScheduleList",
+                    JSON.stringify({}),
+                    function(data){
+                        //alert("Data Loaded: " + data);
+                        jsonObj = jQuery.parseJSON(data);
+                        $("#ScheduleList").html("");
+
+                        len = Object.keys(jsonObj).length;
+                        line = "<tr><td>Env Name</td><td>from</td><td>to</td><td>who</td><td>why</td><td>action</td></tr>"
+                        $("#ScheduleList").append(line);
+                        if (len > 0)
+                        { 
+                            for (i = 0; i < len; ++i)
+                            {
+                                line = "<tr><td>"+jsonObj[i].envName+"</td><td>"+jsonObj[i].fromTime+"</td><td>"+jsonObj[i].toTime+"</td><td>"+jsonObj[i].who+"</td><td>"+jsonObj[i].why+"</td><td><input type=\"button\" value=\"delete\" id=\"delScheduleBtn\" onclick=\"deleteScheduleInfo('"+jsonObj[i].envName+"','"+jsonObj[i].fromTime+"','"+jsonObj[i].toTime+"')\" /></td></tr>"
+                                $("#ScheduleList").append(line);
+                            }
+                        }
+                    });
+            }
+            function deleteScheduleInfo(envName, fromTime, toTime)
+            {
+                if (!confirm("delete "+envName+"@"+fromTime+"--->"+toTime+"?"))
+                {
+                    return;
+                }
+                $.post("/deleteScheduleInfo",
+                        JSON.stringify({ "fromTime": fromTime, "toTime": toTime, "envName": envName }),
+                        function (data) {
+                            alert(data);
+                            updateScheduleList();
+                        });
+
+            }
+            function getAvailabelEnv(fromTime, toTime)
+            {
+                $.post("/queryAvailableEnv",
+                    JSON.stringify({  "fromTime": fromTime, "toTime": toTime }),
+                    function(data){
+                        //alert("Data Loaded: " + data);
+                        jsonObj = jQuery.parseJSON(data);
+                        $("#availableEnvList2").html("");
+
+                        len = Object.keys(jsonObj).length;
+                        if (len > 0)
+                        {
+                            for (i = 0; i < len; ++i)
+                            {
+                                var option = "<option value=\""+jsonObj[i].envName+"\">"+jsonObj[i].envName+"</option>";
+                                $("#availableEnvList2").append(option);
+                            }
+                        }
+                        else
+                        {
+                            var option = "<option value=\"null\">no available env</option>";
+                            $("#availableEnvList2").append(option);
+                        }
+                        
+                        
+                    
+                    });
+
+            }
+
+            $(document).ready(function(){
+
+            updateScheduleList();
+
+
+            $("#queryBtn").click(function(){
+
+                fromTime = $("#fromTime").val();
+                toTime = $("#toTime").val();
+                if (fromTime.length != 17 || toTime.length!=17)
+                {
+                    alert("invalid input, from time and to time should be YYYYmmDD HH:MM:SS");
+                    return;
+                }
+                getAvailabelEnv(fromTime, toTime);
+                
+                
+        });
+
+
+        $("#bookBtn").click(function () {
+
+                    fromTime = $("#fromTime").val();
+                    toTime = $("#toTime").val();
+                    if (fromTime.length != 17 || toTime.length!=17)
+                    {
+                        alert("invalid input, from time and to time should be YYYYmmDD HH:MM:SS"+fromTime.len);
+                        return;
+                    }
+                    envName = $("#availableEnvList2").find("option:selected").val();
+                    who = $("#who").val();
+                    why = $("#why").val();
+                    if (envName == "null" || envName.length < 3 || who.length < 3 || why.length < 3)
+                    {
+                        alert("invalid input, check envName/who/why");
+                        return;
+                    }
+                    if (!confirm("book "+envName+"@"+fromTime+"--->"+toTime+"?"))
+                    {
+                        return;
+                    }
+
+                    $.post("/bookEnv",
+                        JSON.stringify({ "fromTime": fromTime, "toTime": toTime, "envName": envName, "who":who, "why":why }),
+                        function (data) {
+                            alert(data);
+                            updateScheduleList();
+                            getAvailabelEnv(fromTime, toTime);
+                        });
+
+                });
+    });
+
+        </script>
+
+
+    </head>
+    <body>
+        <style type="text/css">
+            .bisonStyle{
+                background-color:aliceblue;
+            }
+        </style>
+        <p>Test Environments Scheduler</p><br>
+
+        <p class="bisonStyle">
+                Query available environments:<br><br>
+            from(YYYYmmDD HH:MM:SS):&nbsp;&nbsp;<input id="fromTime" value="20231117 00:00:00"/>&nbsp;&nbsp;&nbsp;&nbsp;to(YYYYmmDD HH:MM:SS):&nbsp;&nbsp;<input id="toTime" value="20231217 00:00:00"/><br>
+            <br>
+            available environments:
+            <select id="availableEnvList2">
+                <option value="null">click query to see</option>
+            </select>
+            &nbsp;&nbsp;<input type="button" value="query" id="queryBtn" />
+            <br><br>
+            who:<input type="text" id="who" value="who books this environment"/>
+            <br><br>
+            why:<input type="text" id="why" value="the reason to book this environment"/>
+            <br><br>
+            <input type="button" value="book" id="bookBtn" />
+        </p>
+        <br><br>
+        <p  class="bisonStyle">
+            Schedule Information:<br><br>
+            <table id="ScheduleList" border="1"></table>
+        </p>
+    </body>
+
+</html>
+  

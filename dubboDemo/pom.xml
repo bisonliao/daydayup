@@ -15,7 +15,7 @@
         <dubbo.version>2.7.5</dubbo.version>
         <zkclient.version>0.10</zkclient.version>
         <lombok.version>1.16.18</lombok.version>
-        <spring-boot.version>1.5.7.RELEASE</spring-boot.version>
+        <spring-boot.version>2.5.12</spring-boot.version>
 
 
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

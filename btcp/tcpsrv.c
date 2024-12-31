@@ -175,8 +175,7 @@ int btcp_handle_sync_rcvd2(char * bigbuffer,  struct btcp_tcpconn_handler * hand
 
     btcp_print_tcphdr((const char *)hdr, "recv ack:");
 
-    if ( !btcp_check_tcphdr_flag(FLAG_SYN, (hdr->doff_res_flags)) ||
-     !btcp_check_tcphdr_flag(FLAG_ACK, (hdr->doff_res_flags)) ) 
+    if ( !btcp_check_tcphdr_flag(FLAG_ACK, (hdr->doff_res_flags)) ) 
     {
         btcp_errno = ERR_INVALID_PKG;
         return -1;
@@ -191,19 +190,22 @@ int btcp_handle_sync_rcvd2(char * bigbuffer,  struct btcp_tcpconn_handler * hand
     uint32_t ack_seq = ntohl(hdr->ack_seq);
     if (ack_seq != (handler->local_seq + 1) )
     {
+        printf("%u != %u\n", ack_seq, handler->local_seq + 1);
         btcp_errno = ERR_SEQ_MISMATCH;
         return -1;
     }
     handler->local_seq++;
 
-    if (handler->peer_seq+1 !=(hdr->seq))
+    if ((handler->peer_seq+1) !=ntohl(hdr->seq))
     {
+        printf("%u != %u\n", handler->peer_seq+1, ntohl(hdr->seq));
         btcp_errno = ERR_SEQ_MISMATCH;
         return -1;
     }
     handler->peer_seq++;
     
     handler->status = ESTABLISHED;
+    printf("established!\n");
     return 0;
 }
 
@@ -237,6 +239,7 @@ int main(int argc, char** argv)
             {
                 if (btcp_handle_sync_rcvd1(bigbuffer,  &all_conn_handler[dest_p], &srv, &client_addr))
                 {
+                    fprintf(stderr, "btcp_handle_sync_rcvd1() failed! %d\n", btcp_errno);
                     memset(&all_conn_handler[dest_p], 0, sizeof(struct btcp_tcpconn_handler)); // close the connn
                 }
             }
@@ -244,6 +247,7 @@ int main(int argc, char** argv)
             {
                 if (btcp_handle_sync_rcvd2(bigbuffer,  &all_conn_handler[dest_p], &client_addr))
                 {
+                    fprintf(stderr, "btcp_handle_sync_rcvd2() failed! %d\n", btcp_errno);
                     memset(&all_conn_handler[dest_p], 0, sizeof(struct btcp_tcpconn_handler)); // close the connn
                 }
             }

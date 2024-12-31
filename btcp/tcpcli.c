@@ -172,6 +172,7 @@ int btcp_handle_sync_sent(char * bigbuffer,  struct btcp_tcpconn_handler * handl
     memset(tcphdr, 0, sizeof(union btcp_tcphdr_with_option));
     hdr->ack_seq = htonl(handler->peer_seq+1);
     btcp_set_tcphdr_flag(FLAG_ACK, &(hdr->doff_res_flags));
+
     hdr->dest = htons(handler->peer_port);
     hdr->source = htons(handler->local_port);
     hdr->seq = htonl(handler->local_seq);
@@ -196,6 +197,7 @@ int btcp_handle_sync_sent(char * bigbuffer,  struct btcp_tcpconn_handler * handl
     handler->status = ESTABLISHED;
 
     btcp_print_tcphdr((const char *)hdr, "send ack:");
+    printf("established!\n");
     return 0;
 }
 
@@ -242,7 +244,7 @@ int main(int argc, char** argv)
         }
         else if (ret == 0)
         {
-            printf("Timeout.\n");
+            //printf("Timeout.\n");
         }
         else
         {

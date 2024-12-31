@@ -246,7 +246,7 @@ unsigned int btcp_get_random()
     static char initflag = 0;
     if (!initflag)
     {
-        srandom(time(NULL));
+        srandom(getpid());
         initflag = 1;
     }
     // 生成 10 个随机数

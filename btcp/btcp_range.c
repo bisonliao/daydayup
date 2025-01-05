@@ -78,6 +78,10 @@ int btcp_range_subtract( GList *a,  GList *b, GList **result) {
         {
             struct btcp_range *a_range = (struct btcp_range *)a_iter->data;
 
+            GList *subtracted = btcp_range_subtract_single(a_range, b_range);
+            new_a = g_list_concat(new_a, subtracted); //subtracted这时候就变成了new_a的一部分，可以认为无效了，不要释放，也不要做其他操作
+
+#if 0
             if (btcp_range_overlap(a_range, b_range)) // 有重叠就减去
             {
                 GList *subtracted = btcp_range_subtract_single(a_range, b_range);
@@ -90,30 +94,22 @@ int btcp_range_subtract( GList *a,  GList *b, GList **result) {
                 a1->to = a_range->to;
                 new_a = g_list_append(new_a, a1); 
             }
+#endif
         }
         // 处理下一个b_range的时候，就用new_a替代aa。因为aa里的每个range都减去了b_range，得到一个新的aa了
-        if (new_a != NULL)
+        //if (new_a != NULL)
         {
             btcp_range_free_list(aa);
             aa = new_a;
-            printf("get new a: ");
-            btcp_range_print_list(aa);
+            //printf("get new a: ");
+            //btcp_range_print_list(aa);
         }
     }
 
     *result = aa;
     return 0;
 }
-/*
-// 比较两个 range 的起始位置
-static int btcp_range_compare(const void *a, const void *b) {
-    const struct btcp_range *r1 = (const struct btcp_range *)a;
-    const struct btcp_range *r2 = (const struct btcp_range *)b;
-    if (r1->from < r2->from) return -1;
-    if (r1->from > r2->from) return 1;
-    return 0;
-}
-*/
+
 
 // 合并一组 range
 int btcp_range_list_combine(GList *a, GList **result) {
@@ -209,6 +205,7 @@ int main() {
     a1->to = 6;
     a = g_list_append(a, a1);
 
+#if 1
     a1 = malloc(sizeof(struct btcp_range));
     a1->from = 10;
     a1->to = 14;
@@ -218,12 +215,13 @@ int main() {
     a1->from = 5;
     a1->to = 9;
     a = g_list_append(a, a1);
+    #endif
     ////////////////////////////////////
     b1 = malloc(sizeof(struct btcp_range));
     b1->from = 15;
     b1->to = 17;
     b = g_list_append(b, b1);
-
+#if 1
     b1 = malloc(sizeof(struct btcp_range));
     b1->from = 0;
     b1->to = 2;
@@ -233,11 +231,12 @@ int main() {
     b1->from = 5;
     b1->to = 6;
     b = g_list_append(b, b1);
-
+#endif
     // 计算 result = a - b
     GList *result = NULL;
    
     btcp_range_subtract(a, b, &result);
+    //result = btcp_range_subtract_single(a1, b1);
     
 
     // 打印结果

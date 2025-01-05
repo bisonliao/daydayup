@@ -100,7 +100,7 @@ int btcp_tcpcli_connect(const char * ip, short int port, struct btcp_tcpconn_han
         
         hdr->source = htons(handler->local_port);
         handler->peer_port = port;
-        handler->local_seq = btcp_get_random();
+        handler->local_seq = btcp_get_random()%UINT16_MAX;
         hdr->window = htons(DEF_RECV_BUFSZ);
         hdr->seq = htonl(handler->local_seq);
         btcp_set_tcphdr_flag(FLAG_SYN, &(hdr->doff_res_flags));
@@ -268,13 +268,13 @@ int btcp_try_send(struct btcp_tcpconn_handler *handler)
         goto btcp_try_send_out;
     }
     {
-        g_info("%lu, onraod data range：", range_list_sent);
+        g_info("%lu, onraod data range:", range_list_sent);
         for (const GList *iter = range_list_sent; iter != NULL; iter = iter->next)
         {
             struct btcp_range *a_range = (struct btcp_range *)iter->data;
             g_info("[%llu, %llu]", a_range->from, a_range->to);
         }
-        g_info("\n");
+        
     }
     GList * range_list_result = NULL, *combined_list = NULL;
     if (btcp_range_subtract(range_list_to_send, range_list_sent, &range_list_result))
@@ -284,13 +284,12 @@ int btcp_try_send(struct btcp_tcpconn_handler *handler)
     }
     btcp_range_list_combine(range_list_result, &combined_list);
     {
-        g_info("data to send：");
+        g_info("data to send:");
         for (const GList *iter = combined_list; iter != NULL; iter = iter->next)
         {
             struct btcp_range *a_range = (struct btcp_range *)iter->data;
             g_info("[%llu, %llu]", a_range->from, a_range->to);
         }
-        g_info("\n");
     }
     //发送，并插入超时等待队列
     struct sockaddr_in server_addr;
@@ -322,7 +321,7 @@ int btcp_try_send(struct btcp_tcpconn_handler *handler)
 
             
             struct btcp_tcphdr * hdr = (struct btcp_tcphdr *)bigbuffer;
-            memset(&hdr, 0, sizeof(struct btcp_tcphdr));
+            memset(hdr, 0, sizeof(struct btcp_tcphdr));
             hdr->dest = htons(handler->peer_port);
             hdr->source = htons(handler->local_port);
             hdr->window = htons(DEF_RECV_BUFSZ);
@@ -347,8 +346,8 @@ int btcp_try_send(struct btcp_tcpconn_handler *handler)
             g_info("sent successfully, len:%d\n", sent_len);
             // 记录超时事件
             struct btcp_range c_range;
-            c_range.from = b_range.from % UINT16_MAX;
-            c_range.to = b_range.to % UINT16_MAX;
+            c_range.from = b_range.from % UINT32_MAX;
+            c_range.to = b_range.to % UINT32_MAX;
 
             if (btcp_timeout_add_event(&handler->timeout, 5, &c_range, sizeof(c_range), btcp_range_cmp))
             {
@@ -531,7 +530,7 @@ int main(int argc, char** argv)
         //sz = read(0, buf, sizeof(buf));
         memset(buf, 'A', sz);
         write(handler.user_socket_pair[0], buf, sz);
-        usleep(10000000);
+        usleep(1000000);
     }
     return 0;
 }

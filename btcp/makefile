@@ -1,3 +1,6 @@
+CFLAGS	=-I/usr/include/glib-2.0 -I/usr/lib/arm-linux-gnueabihf/glib-2.0/include
+CLIBS	=-lglib-2.0 -lpthread
+
 all: cli srv
 
 cli:tcpcli.c common.c circular_queue.c
@@ -8,3 +11,6 @@ srv:tcpsrv.c common.c circular_queue.c
 
 clean: 
 	rm *.o cli srv
+
+ttx:btcp_range.c
+	gcc -o ttx btcp_range.c $(CFLAGS) $(CLIBS)

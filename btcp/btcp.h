@@ -10,7 +10,8 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <unistd.h>
-
+#include "btcp_send_queue.h"
+#include "btcp_timeout.h"
 #include "circular_queue.h"
 
 extern int btcp_errno;
@@ -19,7 +20,7 @@ int btcp_alloc_local_port();
 int btcp_free_local_port(unsigned short port);
 unsigned int btcp_get_random();
 
-#define UDP_COMM_PORT (7356)
+
 #define DEF_RECV_BUFSZ (4096)
 #define DEF_SEND_BUFSZ (4096)
 
@@ -33,6 +34,8 @@ unsigned int btcp_get_random();
 #define ERR_SEQ_MISMATCH (-106)
 #define ERR_PORT_MISMATCH (-107)
 #define ERR_INVALID_ARG (-108)
+#define ERR_UDP_PORT_USED (-109)
+#define ERR_MEM_ERROR (-110)
 
 enum btcp_tcpconn_status
 {
@@ -61,13 +64,18 @@ struct btcp_tcpconn_handler
     int cong_wnd;
 
     int mss;
-    uint32_t local_seq;
+    uint32_t local_seq; //发送窗口（允许未被确认的字节段）的第一个字节编号
     uint32_t peer_seq; //到目前为止已经可以确认收到的对端的sequence， 我端发出报文的ack seq等于peer_seq+1
     int local_port;
     int peer_port;
     enum btcp_tcpconn_status status;
+    
     btcp_circular_queue recv_buf;
-    btcp_circular_queue send_buf;
+
+    struct btcp_send_queue send_buf;
+    struct btcp_timeout timeout; //发送的报文的超时控制
+
+    int user_socket_pair[2]; // unix domain socket，用来和上层应用进行收发数据, 上层应用读写user_socket_pair[0], btcp读写user_socket_pair[1]，他们是相连的一对
 };
 struct btcp_tcphdr
 {

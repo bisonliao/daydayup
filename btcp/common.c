@@ -391,6 +391,39 @@ int btcp_print_tcphdr(const char*bigbuffer, const char * msg)
         );
     return 0;
 }
+
+int btcp_check_udp_port_in_use(unsigned short port) 
+{
+    int sockfd;
+    struct sockaddr_in addr;
+
+    // 创建 UDP socket
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd == -1) {
+        return -1;
+    }
+
+    // 设置地址结构
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_ANY); // 绑定到所有接口
+    addr.sin_port = htons(port);              // 绑定到指定端口
+
+    // 尝试绑定
+    if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+        if (errno == EADDRINUSE) {
+            close(sockfd);
+            return 1; // 端口已被占用
+        } else {
+            close(sockfd);
+            return -1; // 发生其他错误
+        }
+    }
+
+    // 绑定成功，端口未被占用
+    close(sockfd);
+    return 0;
+}
     
 
 

@@ -30,7 +30,7 @@ int btcp_tcpsrv_listen(const char * ip, short int port, struct btcp_tcpsrv_handl
         memset(&server_addr, 0, sizeof(server_addr));
         server_addr.sin_family = AF_INET;
         server_addr.sin_addr.s_addr = inet_addr(ip);
-        server_addr.sin_port = htons(UDP_COMM_PORT);
+        server_addr.sin_port = htons(port);
 
         // 绑定套接字到指定端口
         if (bind(sockfd, (const struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
@@ -74,7 +74,7 @@ int btcp_handle_sync_rcvd1(char * bigbuffer,  struct btcp_tcpconn_handler * hand
         char peer_ip[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &client_addr->sin_addr, peer_ip, INET_ADDRSTRLEN);
 
-        printf("peer ip:%s\n", peer_ip);
+     
         strcpy(handler->peer_ip, peer_ip);
 
         int mtu = btcp_get_route_mtu(peer_ip);
@@ -92,7 +92,7 @@ int btcp_handle_sync_rcvd1(char * bigbuffer,  struct btcp_tcpconn_handler * hand
             btcp_errno = ERR_INIT_CQ_FAIL;
             return -1;
         }
-        if (btcp_init_queue(&handler->send_buf, DEF_SEND_BUFSZ))
+        if (btcp_send_queue_init(&handler->send_buf, DEF_SEND_BUFSZ))
         {
             btcp_errno = ERR_INIT_CQ_FAIL;
             return -1;
@@ -134,9 +134,9 @@ int btcp_handle_sync_rcvd1(char * bigbuffer,  struct btcp_tcpconn_handler * hand
     memset(tcphdr, 0, sizeof(union btcp_tcphdr_with_option));
     hdr->ack_seq = htonl(handler->peer_seq+1);
     btcp_set_tcphdr_flag(FLAG_ACK, &(hdr->doff_res_flags));
-    printf("%u\n", hdr->doff_res_flags);
+    
     btcp_set_tcphdr_flag(FLAG_SYN, &(hdr->doff_res_flags));
-    printf("%u\n", hdr->doff_res_flags);
+ 
     hdr->dest = htons(handler->peer_port);
     hdr->source = htons(handler->local_port);
     hdr->seq = htonl(handler->local_seq);
@@ -144,16 +144,16 @@ int btcp_handle_sync_rcvd1(char * bigbuffer,  struct btcp_tcpconn_handler * hand
     
     offset = sizeof(struct btcp_tcphdr);
     btcp_set_tcphdr_offset(offset, &hdr->doff_res_flags);
-    printf("%u\n", hdr->doff_res_flags);
+  
 
     struct sockaddr_in server_addr;
     // 初始化服务器地址结构
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = inet_addr(handler->peer_ip);
-    server_addr.sin_port = htons(UDP_COMM_PORT);
+    server_addr.sin_port = htons(handler->peer_port);
 
-    printf("send package to %s\n", handler->peer_ip);
+
 
     if (sendto(handler->udp_socket, hdr, offset, 0, (const struct sockaddr *)&server_addr, sizeof(server_addr)) != offset)
     {
@@ -190,7 +190,7 @@ int btcp_handle_sync_rcvd2(char * bigbuffer,  struct btcp_tcpconn_handler * hand
     uint32_t ack_seq = ntohl(hdr->ack_seq);
     if (ack_seq != (handler->local_seq + 1) )
     {
-        printf("%u != %u\n", ack_seq, handler->local_seq + 1);
+       
         btcp_errno = ERR_SEQ_MISMATCH;
         return -1;
     }
@@ -198,7 +198,7 @@ int btcp_handle_sync_rcvd2(char * bigbuffer,  struct btcp_tcpconn_handler * hand
 
     if ((handler->peer_seq+1) !=ntohl(hdr->seq))
     {
-        printf("%u != %u\n", handler->peer_seq+1, ntohl(hdr->seq));
+        
         btcp_errno = ERR_SEQ_MISMATCH;
         return -1;
     }
@@ -232,7 +232,7 @@ int main(int argc, char** argv)
             char ip_str[INET_ADDRSTRLEN]; // 用于存储IP地址字符串
             inet_ntop(AF_INET, &client_addr.sin_addr, ip_str, INET_ADDRSTRLEN);
             
-            printf("recv %d bytes from %s\n", iret, ip_str);
+            
             unsigned short dest_p, source_p;
             int dest_port = btcp_get_port(bigbuffer, &dest_p, &source_p);
             if (all_conn_handler[dest_p].local_port == 0) // not initialized

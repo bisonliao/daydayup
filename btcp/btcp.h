@@ -57,11 +57,12 @@ struct btcp_tcpconn_handler
 {
     int udp_socket;
     char peer_ip[INET_ADDRSTRLEN];
-    char my_ip[INET_ADDRSTRLEN];
+    char local_ip[INET_ADDRSTRLEN];
 
     int my_recv_wnd_sz;
     int peer_recv_wnd_sz;
     int cong_wnd;
+    int cong_wnd_threshold;
 
     int mss;
     uint32_t local_seq; //发送窗口（允许未被确认的字节段）的第一个字节编号

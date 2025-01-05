@@ -112,6 +112,8 @@ void btcp_send_queue_clear(struct btcp_send_queue *queue) {
     queue->size = 0;
 }
 
+
+
 // 从队列里取一段数据，数据的范围由其对应的seq对应[from, to]
 int btcp_send_queue_fetch_data(struct btcp_send_queue *queue, uint64_t from, uint64_t to, unsigned char* data)
 {

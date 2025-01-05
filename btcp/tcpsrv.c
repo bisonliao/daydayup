@@ -67,9 +67,6 @@ int btcp_handle_sync_rcvd1(char * bigbuffer,  struct btcp_tcpconn_handler * hand
     
     {
         memset(handler, 0, sizeof(struct btcp_tcpconn_handler));
-
-        
-        
         handler->peer_port = ntohs(hdr->source);
         char peer_ip[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &client_addr->sin_addr, peer_ip, INET_ADDRSTRLEN);
@@ -92,7 +89,7 @@ int btcp_handle_sync_rcvd1(char * bigbuffer,  struct btcp_tcpconn_handler * hand
             btcp_errno = ERR_INIT_CQ_FAIL;
             return -1;
         }
-        if (btcp_send_queue_init(&handler->send_buf, DEF_SEND_BUFSZ))
+        if (!btcp_send_queue_init(&handler->send_buf, DEF_SEND_BUFSZ))
         {
             btcp_errno = ERR_INIT_CQ_FAIL;
             return -1;
@@ -217,7 +214,7 @@ int main(int argc, char** argv)
     static struct btcp_tcpsrv_handler srv;
    
     
-    if (btcp_tcpsrv_listen("192.168.0.11", 80, &srv) < 0)
+    if (btcp_tcpsrv_listen("192.168.0.11", 8080, &srv) < 0)
     {
         printf("btcp_tcpsrv_listen failed, errno=%d\n", btcp_errno);
         return -1;
@@ -234,18 +231,19 @@ int main(int argc, char** argv)
             
             
             unsigned short dest_p, source_p;
-            int dest_port = btcp_get_port(bigbuffer, &dest_p, &source_p);
-            if (all_conn_handler[dest_p].local_port == 0) // not initialized
+            btcp_get_port(bigbuffer, &dest_p, &source_p);
+            g_info("rcvd pkg, source:%d, peer_port:%d, status:%d", source_p, all_conn_handler[source_p].peer_port, all_conn_handler[source_p].status);
+            if (all_conn_handler[source_p].peer_port == 0) // not initialized
             {
-                if (btcp_handle_sync_rcvd1(bigbuffer,  &all_conn_handler[dest_p], &srv, &client_addr))
+                if (btcp_handle_sync_rcvd1(bigbuffer,  &all_conn_handler[source_p], &srv, &client_addr))
                 {
                     fprintf(stderr, "btcp_handle_sync_rcvd1() failed! %d\n", btcp_errno);
                     memset(&all_conn_handler[dest_p], 0, sizeof(struct btcp_tcpconn_handler)); // close the connn
                 }
             }
-            else if (all_conn_handler[dest_p].status == SYNC_RCVD)
+            else if (all_conn_handler[source_p].status == SYNC_RCVD)
             {
-                if (btcp_handle_sync_rcvd2(bigbuffer,  &all_conn_handler[dest_p], &client_addr))
+                if (btcp_handle_sync_rcvd2(bigbuffer,  &all_conn_handler[source_p], &client_addr))
                 {
                     fprintf(stderr, "btcp_handle_sync_rcvd2() failed! %d\n", btcp_errno);
                     memset(&all_conn_handler[dest_p], 0, sizeof(struct btcp_tcpconn_handler)); // close the connn

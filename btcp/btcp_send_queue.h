@@ -25,6 +25,9 @@ void btcp_send_queue_destroy(struct btcp_send_queue *queue);
 // 检查队列是否为空
 bool btcp_send_queue_is_empty(struct btcp_send_queue *queue);
 
+// 返回空闲空间的字节数
+int btcp_send_queue_get_available_space(struct btcp_send_queue *queue);
+
 // 检查队列是否已满
 bool btcp_send_queue_is_full(struct btcp_send_queue *queue);
 

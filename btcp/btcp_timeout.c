@@ -92,7 +92,7 @@ int btcp_timeout_add_event(struct btcp_timeout *handler, int sec, void *event, i
 }
 int  btcp_timeout_get_all_event(struct btcp_timeout *handler, GList **result)
 {
-    GList * tmp_result;
+    GList * tmp_result = NULL;
     struct btcp_timeout_event *current = handler->head;
     
     for (; current != NULL;current = current->next ) 

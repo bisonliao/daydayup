@@ -1,12 +1,13 @@
 CFLAGS	=-I/usr/include/glib-2.0 -I/usr/lib/arm-linux-gnueabihf/glib-2.0/include
 CLIBS	=-lglib-2.0 -lpthread
+FILES	= common.c circular_queue.c btcp_timeout.c btcp_send_queue.c btcp_range.c
 
 all: cli srv
 
-cli:tcpcli.c common.c circular_queue.c
-	gcc -o cli tcpcli.c common.c circular_queue.c -lpthread 
-srv:tcpsrv.c common.c circular_queue.c
-	gcc -o srv tcpsrv.c common.c circular_queue.c -lpthread 
+cli:tcpcli.c $(FILES)
+	gcc -o cli  $^  $(CFLAGS) $(CLIBS)
+srv:tcpsrv.c $(FILES)
+	gcc -o srv $^  $(CFLAGS) $(CLIBS)
 	scp srv pi@192.168.0.11:~/btcp/
 
 clean: 

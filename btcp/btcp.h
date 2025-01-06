@@ -13,6 +13,7 @@
 #include "btcp_send_queue.h"
 #include "btcp_timeout.h"
 #include "circular_queue.h"
+#include <glib.h>
 
 extern int btcp_errno;
 int btcp_get_route_mtu(const char *dest_ip);
@@ -51,6 +52,8 @@ struct btcp_tcpsrv_handler
     char my_ip[INET_ADDRSTRLEN];
 
     int local_port;
+
+    GHashTable * all_connections;
 };
 
 struct btcp_tcpconn_handler
@@ -131,5 +134,15 @@ int btcp_set_socket_nonblock(int sockfd);
 int btcp_is_readable(int sockfd, int to, char * bigbuffer, int buflen, struct sockaddr_in *client_addr);
 int btcp_get_port(const char*bigbuffer, unsigned short * dest, unsigned short *source);
 int btcp_print_tcphdr(const char*bigbuffer, const char * msg);
+
+
+
+//暴露给开发者使用引擎的几个主要函数
+int btcp_tcpsrv_listen(const char * ip, short int port, struct btcp_tcpsrv_handler * srv);
+int btcp_tcpcli_connect(const char * ip, short int port, struct btcp_tcpconn_handler * handler);
+int btcp_tcpcli_new_loop_thread(struct btcp_tcpconn_handler *handler); 
+int btcp_tcpsrv_new_loop_thread(struct btcp_tcpsrv_handler * srv);
+GList *  btcp_tcpsrv_get_all_connections(struct btcp_tcpsrv_handler * srv);
+
 
 #endif

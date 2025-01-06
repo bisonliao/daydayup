@@ -84,7 +84,7 @@ int btcp_tcpsrv_listen(const char * ip, short int port, struct btcp_tcpsrv_handl
     {
         srv->all_connections = g_hash_table_new_full(btcp_tcpconn_hash, btcp_tcpconn_equal,
                 btcp_tcpconn_key_destroy, btcp_tcpconn_value_destroy);
-        if (srv->all_connections)
+        if (srv->all_connections == NULL)
         {
             btcp_errno = ERR_MEM_ERROR;
             return -1;
@@ -598,7 +598,16 @@ static int btcp_try_send(struct btcp_tcpconn_handler *handler)
     {
         return 0;
     }
+    g_info("send_wndsz:%d, mss:%d, cong_wnd:%d, peer wndsz:%d", 
+            send_wndsz,
+            handler->mss,
+            handler->cong_wnd,
+            handler->peer_recv_wnd_sz);
     int datasz_in_queue = btcp_send_queue_size(&handler->send_buf);
+    if (datasz_in_queue < 1)
+    {
+        return 0;
+    }
     //g_info("尝试发送数据，窗口大小为%d bytes, 发送缓冲里的数据有 %d bytes\n", send_wndsz, datasz_in_queue);
     //发送窗口的范围，与已经发送的待ack报文覆盖的范围比较，找出需要发送的数据段 ，
     //这里参与运算的seq/from/to使用uint64_t类型，且保证to >= from，即to可能大于UINT32_MAX
@@ -867,7 +876,7 @@ int btcp_tcpcli_new_loop_thread(struct btcp_tcpconn_handler *handler)
     return 0;
 }
 
-static int btcp_tcpsrv_loop(void * arg)
+static void* btcp_tcpsrv_loop(void * arg)
 {
     struct btcp_tcpsrv_handler * srv = (struct btcp_tcpsrv_handler*)arg;
     static char bigbuffer[100*1024]  __attribute__((aligned(8)));
@@ -896,7 +905,7 @@ static int btcp_tcpsrv_loop(void * arg)
             if (conn == NULL) //没有就创建并插入
             {
                 
-                conn = btcp_handle_sync_rcvd1(bigbuffer,  &srv, &client_addr);
+                conn = btcp_handle_sync_rcvd1(bigbuffer,  srv, &client_addr);
                 if (conn == NULL)
                 {
                     fprintf(stderr, "btcp_handle_sync_rcvd1() failed! %d\n", btcp_errno);
@@ -914,7 +923,7 @@ static int btcp_tcpsrv_loop(void * arg)
                 {
                     fprintf(stderr, "btcp_handle_sync_rcvd2() failed! %d\n", btcp_errno);
 
-                    g_hash_table_remove(srv->all_connections, &key) // close the connn
+                    g_hash_table_remove(srv->all_connections, &key); // close the connn
                 }
             }
             else if (conn->status == ESTABLISHED)
@@ -922,7 +931,7 @@ static int btcp_tcpsrv_loop(void * arg)
                 if (btcp_handle_data_rcvd(bigbuffer, pkg_len, conn, &client_addr))
                 {
                     fprintf(stderr, "btcp_handle_data_rcvd() failed! %d\n", btcp_errno);
-                    g_hash_table_remove(srv->all_connections, &key) // close the connn // close the connn
+                    g_hash_table_remove(srv->all_connections, &key); // close the connn // close the connn
                 }
             }
 

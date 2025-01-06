@@ -1,6 +1,6 @@
 CFLAGS	=-I/usr/include/glib-2.0 -I/usr/lib/arm-linux-gnueabihf/glib-2.0/include
 CLIBS	=-lglib-2.0 -lpthread
-FILES	= common.c circular_queue.c btcp_timeout.c btcp_send_queue.c btcp_range.c
+FILES	= tool.c circular_queue.c btcp_timeout.c btcp_send_queue.c btcp_range.c btcp_engine.c
 
 all: cli srv
 

@@ -20,7 +20,7 @@
 
 
 //服务端收到建联请求1
-int btcp_handle_sync_rcvd1(char * bigbuffer,  struct btcp_tcpconn_handler * handler, 
+int btcp_handle_sync_rcvd1(char * bigbuffer,   
                             struct btcp_tcpsrv_handler* srv, 
                             const struct sockaddr_in * client_addr);
 //服务端收到建联请求2

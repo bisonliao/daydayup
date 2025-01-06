@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <time.h>
 #include <glib.h>
+#include "btcp_range.h"
 
 // 事件结构体
 struct btcp_timeout_event {
@@ -37,5 +38,8 @@ int btcp_timeout_remove_event(struct btcp_timeout *handler, void *event, int len
 
 //遍历得到所有事件，保存在result里
 int  btcp_timeout_get_all_event(struct btcp_timeout *handler, GList **result);
+
+// 删除指定范围内的事件
+int btcp_timeout_remove_range(struct btcp_timeout *handler, const struct btcp_range * range);
 
 #endif // BTCP_TIMEOUT_H

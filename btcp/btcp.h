@@ -69,7 +69,7 @@ struct btcp_tcpconn_handler
 
     int mss;
     uint32_t local_seq; //发送窗口（允许未被确认的字节段）的第一个字节编号
-    uint32_t peer_seq; //到目前为止已经可以确认收到的对端的sequence， 我端发出报文的ack seq等于peer_seq+1
+    uint32_t peer_seq; //期望收到对端发的顺序包的起始sequence，
     int local_port;
     int peer_port;
     enum btcp_tcpconn_status status;

@@ -140,7 +140,37 @@ int btcp_timeout_remove_event(struct btcp_timeout *handler, void *event, int len
     return -1;  // 返回 -1 表示未找到匹配的事件
 }
 
+int btcp_timeout_remove_range(struct btcp_timeout *handler, const struct btcp_range * range)
+{
+    struct btcp_timeout_event *current = handler->head;
+    struct btcp_timeout_event *prev = NULL;
 
+    while (current != NULL) {
+        struct btcp_range range_in_list = *(const struct btcp_range *)(current->event_data);
+        if (range_in_list.to <range_in_list.from)
+        {
+            range_in_list.to = range_in_list.to + UINT32_MAX + 1;
+        }
+        if (range->from <= range_in_list.from && range->to >= range_in_list.to)
+        {
+            // 找到匹配的事件，从链表中移除
+            if (prev == NULL) {
+                handler->head = current->next;
+            } else {
+                prev->next = current->next;
+            }
+
+            // 释放事件数据和节点
+            free(current->event_data);
+            free(current);
+        }
+
+        prev = current;
+        current = current->next;
+    }
+
+    return 0;
+}
 
 
 

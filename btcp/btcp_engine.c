@@ -273,6 +273,36 @@ static int btcp_handle_sync_rcvd2(char * bigbuffer,  struct btcp_tcpconn_handler
     printf("established!\n");
     return 0;
 }
+
+static int btcp_handle_ack(union btcp_tcphdr_with_option *tcphdr, struct btcp_tcpconn_handler *handler)
+{
+    struct btcp_tcphdr * hdr = &tcphdr->base_hdr;
+    uint32_t ack_seq32 = ntohl(hdr->ack_seq);
+    uint64_t ack_seq64 = ack_seq32;
+    
+    
+    if (ack_seq32 < handler->local_seq) //发生了回绕
+    {
+        ack_seq64 = ack_seq32 + UINT32_MAX + 1;
+    }
+    
+    if (ack_seq64 > (handler->local_seq + 65535)) // 大太多了，就算是累计确认也不能差这么多
+    {
+        g_error("ack sequence is too big! %u, %u", ack_seq32, handler->local_seq);
+        return -1;
+    }
+    struct btcp_range range;
+    range.from = handler->local_seq;
+    range.to = ack_seq64;
+
+    handler->local_seq = ack_seq32;
+    btcp_send_queue_set_start_seq(&handler->send_buf, ack_seq64);
+    g_info("local sequence step forward to %u", handler->local_seq);
+    //删除可能的定时器
+    btcp_timeout_remove_range(&handler->timeout, &range);
+
+    return 0;
+}
 static int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_handler * handler, 
             const struct sockaddr_in * client_addr)
 {
@@ -298,37 +328,37 @@ static int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpc
      
 
     if ( btcp_check_tcphdr_flag(FLAG_ACK, (hdr->doff_res_flags)) ) // 如果带有ack标记
-    {
-        #if 0
-        // todo: process ack response
-        uint32_t ack_seq = ntohl(hdr->ack_seq);
-        if (ack_seq != (handler->local_seq + 1))
-        {
-
-            btcp_errno = ERR_SEQ_MISMATCH;
-            return -1;
-        }
+    {        
         btcp_handle_ack(tcphdr, handler);
-        #endif
     }
     // todo :save to recv buffer
 
     // ack this data
     if (data_len > 0)
     {
-        if ((handler->peer_seq + 1) == ntohl(hdr->seq)) // 按顺序的报文
+        g_info("data_len:%d, peer_seq:%u", data_len, handler->peer_seq);
+        if ((handler->peer_seq ) == ntohl(hdr->seq)) // 按顺序的报文
         {
             // sequence step forward
             uint64_t tmp_seq = handler->peer_seq;
             tmp_seq += data_len;
             handler->peer_seq = tmp_seq % ((uint64_t)1 + UINT32_MAX);
+
+            g_info("peer_seq changes to:%u",  handler->peer_seq);
         }
         else// 收到不是按顺序的, 那也要 重新ack当前peer_seq
         {
         }
         // send ack package
+
+        uint64_t ack_seq64 = handler->peer_seq;
+        ack_seq64 =  ack_seq64 %((uint64_t)1+UINT32_MAX);
+        uint32_t ack_seq32 = ack_seq64;
+
+        g_info("ack seq:%u", ack_seq32);
+
         memset(tcphdr, 0, sizeof(union btcp_tcphdr_with_option));
-        hdr->ack_seq = htonl(handler->peer_seq + 1);
+        hdr->ack_seq = htonl(ack_seq32);
         btcp_set_tcphdr_flag(FLAG_ACK, &(hdr->doff_res_flags));
         hdr->dest = htons(handler->peer_port);
         hdr->source = htons(handler->local_port);
@@ -438,7 +468,6 @@ int btcp_tcpcli_connect(const char * ip, short int port, struct btcp_tcpconn_han
     handler->my_recv_wnd_sz = DEF_RECV_BUFSZ;
     
     if (btcp_tcpcli_init_udp(handler)) { return -1;}
-
     
     g_info("in connect(), peer ip:%s, mss:%d, peer_port:%d\n", handler->peer_ip, handler->mss, handler->peer_port);
     // three handshakes
@@ -579,6 +608,7 @@ static int btcp_handle_sync_sent(char * bigbuffer,  struct btcp_tcpconn_handler 
         perror("socketpair");
         exit(EXIT_FAILURE);
     }
+    g_info("socketpair() success, %u", handler);
 
     btcp_print_tcphdr((const char *)hdr, "send ack:");
     printf("established!\n");
@@ -598,11 +628,13 @@ static int btcp_try_send(struct btcp_tcpconn_handler *handler)
     {
         return 0;
     }
+    /*
     g_info("send_wndsz:%d, mss:%d, cong_wnd:%d, peer wndsz:%d", 
             send_wndsz,
             handler->mss,
             handler->cong_wnd,
             handler->peer_recv_wnd_sz);
+            */
     int datasz_in_queue = btcp_send_queue_size(&handler->send_buf);
     if (datasz_in_queue < 1)
     {
@@ -761,23 +793,24 @@ static int btcp_check_send_timeout(struct btcp_tcpconn_handler *handler)
 static void* btcp_tcpcli_loop(void *arg)
 {
     struct btcp_tcpconn_handler *handler = (struct btcp_tcpconn_handler *)arg;
-    printf("btcp_tcpcli_loop() start...\n");
+    printf("btcp_tcpcli_loop() start...,  %d, %u\n", sizeof(void*), handler);
     int timeout = 100; // 默认0.1s
     
-    struct pollfd pfd[2];
-    pfd[0].fd = handler->udp_socket;
-    pfd[0].events = POLLIN;
-
-    pfd[1].fd = handler->user_socket_pair[1];
-    pfd[1].events = POLLIN;
-
     static char bigbuffer[1024*64] __attribute__((aligned(8))); 
     struct sockaddr_in client_addr;
     socklen_t addr_len = sizeof(client_addr);
 
     while (1)
     {
+        struct pollfd pfd[2];
+        pfd[0].fd = handler->udp_socket;
+        pfd[0].events = POLLIN;
+
+        pfd[1].fd = handler->user_socket_pair[1];
+        pfd[1].events = POLLIN;
+
         int ret = poll(pfd, 2, timeout); // 1 秒超时
+       
         if (ret > 0)
         {
             if (pfd[0].revents & POLLIN) //底层udp可读，收包并处理
@@ -812,7 +845,7 @@ static void* btcp_tcpcli_loop(void *arg)
             if (pfd[1].revents & POLLIN) //用户层发数据过来了，放置到发送队列里
             {
                 int space = btcp_send_queue_get_available_space(&handler->send_buf); // 获得发送缓冲区的空闲空间大小
-               // g_info("上层应用有数据要发送，缓冲区可用空间%d bytes\n", space);
+                g_info("available space:%d bytes\n", space);
                 if (space > 0 && handler->status == ESTABLISHED)
                 {
                     ssize_t received = read(pfd[1].fd, bigbuffer, space);

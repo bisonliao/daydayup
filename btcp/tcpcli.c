@@ -1,5 +1,4 @@
 #include "btcp.h"
-#include "circular_queue.h"
 #include <poll.h>
 #include <err.h>
 #include <errno.h>

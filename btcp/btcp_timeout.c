@@ -6,15 +6,15 @@
 
 
 // 初始化超时控制器
-void btcp_timeout_init(struct btcp_timeout *handler) {
+void btcp_timer_init(struct btcp_timeout *handler) {
     handler->head = NULL;
 }
 
 // 销毁超时控制器
-void btcp_timeout_destroy(struct btcp_timeout *handler) {
-    struct btcp_timeout_event *current = handler->head;
+void btcp_timer_destroy(struct btcp_timeout *handler) {
+    struct btcp_timer_event *current = handler->head;
     while (current != NULL) {
-        struct btcp_timeout_event *next = current->next;
+        struct btcp_timer_event *next = current->next;
         free(current->event_data);  // 释放事件数据
         free(current);              // 释放事件节点
         current = next;
@@ -23,10 +23,10 @@ void btcp_timeout_destroy(struct btcp_timeout *handler) {
 }
 
 // 检查是否有超时的事件
-int btcp_timeout_check(struct btcp_timeout *handler, void *event, int *len) {
+int btcp_timer_check(struct btcp_timeout *handler, void *event, int *len) {
     time_t current_time = time(NULL);  // 获取当前时间
 
-    struct btcp_timeout_event *current = handler->head;
+    struct btcp_timer_event *current = handler->head;
     if (current == NULL || current->expire_time > current_time) {
         return 0;  // 没有超时的事件
     }
@@ -48,15 +48,15 @@ int btcp_timeout_check(struct btcp_timeout *handler, void *event, int *len) {
 }
 
 // 插入一个未来超时的事件
-int btcp_timeout_add_event(struct btcp_timeout *handler, int sec, void *event, int len, int (*event_cmp)(void *, int, void *, int)) {
+int btcp_timer_add_event(struct btcp_timeout *handler, int sec, void *event, int len, int (*event_cmp)(void *, int, void *, int)) {
     time_t expire_time = time(NULL) + sec;  // 计算超时时间
 
     // 不管三七二十一，先尝试删除再插入，保证有序
-    btcp_timeout_remove_event(handler, event, len, event_cmp);
+    btcp_timer_remove_event(handler, event, len, event_cmp);
     
    
     // 创建新事件
-    struct btcp_timeout_event *new_event = (struct btcp_timeout_event *)malloc(sizeof(struct btcp_timeout_event));
+    struct btcp_timer_event *new_event = (struct btcp_timer_event *)malloc(sizeof(struct btcp_timer_event));
     if (new_event == NULL) {
         return -1;  // 内存分配失败
     }
@@ -71,8 +71,8 @@ int btcp_timeout_add_event(struct btcp_timeout *handler, int sec, void *event, i
     new_event->next = NULL;
 
     // 插入到链表中，按超时时间排序
-    struct btcp_timeout_event *current = handler->head;
-    struct btcp_timeout_event *prev = NULL;
+    struct btcp_timer_event *current = handler->head;
+    struct btcp_timer_event *prev = NULL;
     while (current != NULL && current->expire_time < expire_time) {
         prev = current;
         current = current->next;
@@ -90,10 +90,10 @@ int btcp_timeout_add_event(struct btcp_timeout *handler, int sec, void *event, i
 
     return 0;  // 返回 0 表示成功插入新事件
 }
-int  btcp_timeout_get_all_event(struct btcp_timeout *handler, GList **result)
+int  btcp_timer_get_all_event(struct btcp_timeout *handler, GList **result)
 {
     GList * tmp_result = NULL;
-    struct btcp_timeout_event *current = handler->head;
+    struct btcp_timer_event *current = handler->head;
     
     for (; current != NULL;current = current->next ) 
     {
@@ -114,9 +114,9 @@ int  btcp_timeout_get_all_event(struct btcp_timeout *handler, GList **result)
 }
 
 // 删除指定事件
-int btcp_timeout_remove_event(struct btcp_timeout *handler, void *event, int len, int (*event_cmp)(void *, int, void *, int)) {
-    struct btcp_timeout_event *current = handler->head;
-    struct btcp_timeout_event *prev = NULL;
+int btcp_timer_remove_event(struct btcp_timeout *handler, void *event, int len, int (*event_cmp)(void *, int, void *, int)) {
+    struct btcp_timer_event *current = handler->head;
+    struct btcp_timer_event *prev = NULL;
 
     while (current != NULL) {
         if (event_cmp(current->event_data, current->event_len, event, len) == 0) {
@@ -140,10 +140,10 @@ int btcp_timeout_remove_event(struct btcp_timeout *handler, void *event, int len
     return -1;  // 返回 -1 表示未找到匹配的事件
 }
 
-int btcp_timeout_remove_range(struct btcp_timeout *handler, const struct btcp_range * range)
+int btcp_timer_remove_range(struct btcp_timeout *handler, const struct btcp_range * range)
 {
-    struct btcp_timeout_event *current = handler->head;
-    struct btcp_timeout_event *prev = NULL;
+    struct btcp_timer_event *current = handler->head;
+    struct btcp_timer_event *prev = NULL;
 
     while (current != NULL) {
         struct btcp_range range_in_list = *(const struct btcp_range *)(current->event_data);
@@ -171,7 +171,34 @@ int btcp_timeout_remove_range(struct btcp_timeout *handler, const struct btcp_ra
 
     return 0;
 }
+int btcp_timer_remove_by_from(struct btcp_timeout *handler, uint32_t from)
+{
+    struct btcp_timer_event *current = handler->head;
+    struct btcp_timer_event *prev = NULL;
 
+    while (current != NULL) {
+        struct btcp_range range_in_list = *(const struct btcp_range *)(current->event_data);
+        
+        if (range_in_list.from == from)
+        {
+            // 找到匹配的事件，从链表中移除
+            if (prev == NULL) {
+                handler->head = current->next;
+            } else {
+                prev->next = current->next;
+            }
+
+            // 释放事件数据和节点
+            free(current->event_data);
+            free(current);
+        }
+
+        prev = current;
+        current = current->next;
+    }
+
+    return 0;
+}
 
 
 // 事件比对函数
@@ -183,24 +210,24 @@ static int event_cmp(void *event1, int len1, void *event2, int len2) {
 #if 0
 int main() {
     struct btcp_timeout handler;
-    btcp_timeout_init(&handler);
+    btcp_timer_init(&handler);
 
     // 添加事件
     int event1_data = 100;
-    btcp_timeout_add_event(&handler, 15, &event1_data, sizeof(event1_data), event_cmp);
+    btcp_timer_add_event(&handler, 15, &event1_data, sizeof(event1_data), event_cmp);
 
     int event2_data = 200;
-    btcp_timeout_add_event(&handler, 3, &event2_data, sizeof(event2_data), event_cmp);
+    btcp_timer_add_event(&handler, 3, &event2_data, sizeof(event2_data), event_cmp);
 
     int event3_data = 300;
-    btcp_timeout_add_event(&handler, 5, &event3_data, sizeof(event3_data), event_cmp);
+    btcp_timer_add_event(&handler, 5, &event3_data, sizeof(event3_data), event_cmp);
 
     int event4_data = 400;
-    btcp_timeout_add_event(&handler, 5, &event4_data, sizeof(event4_data), event_cmp);
+    btcp_timer_add_event(&handler, 5, &event4_data, sizeof(event4_data), event_cmp);
 
 
     // 删除事件
-    if (btcp_timeout_remove_event(&handler, &event1_data, sizeof(event1_data), event_cmp) == 0) {
+    if (btcp_timer_remove_event(&handler, &event1_data, sizeof(event1_data), event_cmp) == 0) {
         printf("Event1 removed.\n");
     } else {
         printf("Event1 not found.\n");
@@ -211,7 +238,7 @@ int main() {
         int event;
         int len = sizeof(int);
         int flag = false;
-        while (btcp_timeout_check(&handler, &event, &len) == 1) 
+        while (btcp_timer_check(&handler, &event, &len) == 1) 
         {
             printf("Event timed out: %d\n", event);
             flag = true;
@@ -224,7 +251,7 @@ int main() {
     }
 
     // 销毁超时控制器
-    btcp_timeout_destroy(&handler);
+    btcp_timer_destroy(&handler);
 
     return 0;
 }

@@ -1,6 +1,6 @@
 #include "btcp.h"
 #include "btcp_engine.h"
-#include "circular_queue.h"
+
 #include <poll.h>
 #include <err.h>
 #include <errno.h>
@@ -22,6 +22,11 @@ int main(int argc, char** argv)
     while (1)
     {
         GList *conns = btcp_tcpsrv_get_all_connections(&srv);
+        if (conns != NULL)
+        {
+
+        }
+        btcp_free_conns_in_glist(conns);
         usleep(1000000);
     }
     return 0;

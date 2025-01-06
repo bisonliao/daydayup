@@ -142,7 +142,7 @@ static struct btcp_tcpconn_handler *  btcp_handle_sync_rcvd1(char * bigbuffer,
             free(handler);
             return NULL;
         }
-        if (btcp_init_queue(&handler->recv_buf, DEF_RECV_BUFSZ))
+        if (btcp_recv_queue_init(&handler->recv_buf, DEF_RECV_BUFSZ))
         {
             btcp_errno = ERR_INIT_CQ_FAIL;
             free(handler);
@@ -291,16 +291,69 @@ static int btcp_handle_ack(union btcp_tcphdr_with_option *tcphdr, struct btcp_tc
         g_error("ack sequence is too big! %u, %u", ack_seq32, handler->local_seq);
         return -1;
     }
-    struct btcp_range range;
-    range.from = handler->local_seq;
-    range.to = ack_seq64;
+    if (handler->local_seq == ack_seq32) // 收到对当前sequence的重复确认
+    {
+        handler->repeat_ack++;
+        if (handler->repeat_ack >= 3) //连续收到3次或者以上，触发窗口缩小和重发
+        {
+            handler->repeat_ack = 0;
+            // 修改发送窗口大小
+            handler->cong_wnd_threshold = handler->cong_wnd / 2;
+            
+            if (handler->cong_wnd_threshold < 4)
+            {
+                handler->cong_wnd_threshold = 4;
+            }
+            handler->cong_wnd = handler->cong_wnd_threshold;
+            
+            btcp_timer_remove_by_from(&handler->timeout, handler->local_seq);
+            //btcp_try_send(handler); //删掉计时器里的记录，其实后面就会比较及时的重发
+        }
+    }
+    else
+    {
+        handler->repeat_ack = 0;
 
-    handler->local_seq = ack_seq32;
-    btcp_send_queue_set_start_seq(&handler->send_buf, ack_seq64);
-    g_info("local sequence step forward to %u", handler->local_seq);
-    //删除可能的定时器
-    btcp_timeout_remove_range(&handler->timeout, &range);
+        struct btcp_range range;
+        range.from = handler->local_seq;
+        range.to = ack_seq64;
 
+        handler->local_seq = ack_seq32;
+        btcp_send_queue_set_start_seq(&handler->send_buf, ack_seq64);
+        g_info("local sequence step forward to %u", handler->local_seq);
+        // 删除可能的定时器
+        btcp_timer_remove_range(&handler->timeout, &range);
+    }
+
+    
+
+    return 0;
+}
+
+static int btcp_throw_data_to_user(struct btcp_tcpconn_handler * handler)
+{
+    int size = btcp_recv_queue_size(&handler->recv_buf);
+    if (size <= 0)
+    {
+        g_error("unexpected data size! %s %d", __FILE__, __LINE__);
+        return 0;
+    }
+    unsigned char buf[1024];
+    while (size > 0)
+    {
+        int len = sizeof(buf);
+        if (len > size)
+        {
+            len = size;
+        }
+        btcp_recv_queue_dequeue(&handler->recv_buf, buf, len);
+        size -= len;
+        int written = write(handler->user_socket_pair[1], buf, len);
+        if (written!= len)
+        {
+            g_error("write user socket pair failed!%d, (%s, %d)", written, __FILE__, __LINE__);
+        }
+    }
     return 0;
 }
 static int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_handler * handler, 
@@ -325,32 +378,54 @@ static int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpc
         btcp_errno = ERR_INVALID_PKG;
         return -1;
     }
-     
+    
 
+    int offset = btcp_get_tcphdr_offset(&hdr->doff_res_flags);
+    
+    
     if ( btcp_check_tcphdr_flag(FLAG_ACK, (hdr->doff_res_flags)) ) // 如果带有ack标记
     {        
         btcp_handle_ack(tcphdr, handler);
     }
-    // todo :save to recv buffer
-
-    // ack this data
+      
     if (data_len > 0)
     {
-        g_info("data_len:%d, peer_seq:%u", data_len, handler->peer_seq);
-        if ((handler->peer_seq ) == ntohl(hdr->seq)) // 按顺序的报文
+        uint64_t from_seq = ntohl(hdr->seq);
+        uint64_t to_seq = from_seq + data_len - 1;
+        // save data to recv queue
+        if (btcp_recv_queue_save_data(&handler->recv_buf, from_seq, to_seq,
+                                      bigbuffer + offset))
         {
+            btcp_errno = ERR_SEQ_MISMATCH;
+            return -1;
+        }
+        g_info("data_len:%d, peer_seq:%u", data_len, handler->peer_seq);
+        
+
+        // ack this data
+        if ((handler->peer_seq ) == ntohl(hdr->seq)) // 收到了想要的下一个（顺序）报文，需要移动接收窗口
+        {
+            //移动的大小不一定就等于data_len，因为可能之前已经接到过后发先至的数据段，与这个报文连成一片。
+            int steps = btcp_recv_queue_try_move_wnd(&handler->recv_buf);
+            if (steps < 0)
+            {
+                g_error("btcp_recv_queue_try_move_wnd() failed! %d", steps);
+                btcp_errno = ERR_SEQ_MISMATCH;
+                return -1;
+            }
+
             // sequence step forward
             uint64_t tmp_seq = handler->peer_seq;
-            tmp_seq += data_len;
+            tmp_seq += steps;
             handler->peer_seq = tmp_seq % ((uint64_t)1 + UINT32_MAX);
 
             g_info("peer_seq changes to:%u",  handler->peer_seq);
+            //向应用层抛数据
+            btcp_throw_data_to_user(handler);
         }
-        else// 收到不是按顺序的, 那也要 重新ack当前peer_seq
-        {
-        }
+       // 收到就算不是按顺序的, 那也要 重新ack当前peer_seq，连续三次会触发对端重发想要的下一个报文
+        
         // send ack package
-
         uint64_t ack_seq64 = handler->peer_seq;
         ack_seq64 =  ack_seq64 %((uint64_t)1+UINT32_MAX);
         uint32_t ack_seq32 = ack_seq64;
@@ -453,7 +528,7 @@ int btcp_tcpcli_connect(const char * ip, short int port, struct btcp_tcpconn_han
         btcp_errno = ERR_GET_MTU_FAIL; 
         return -1;
     }
-    if (btcp_init_queue(&handler->recv_buf, DEF_RECV_BUFSZ))
+    if (btcp_recv_queue_init(&handler->recv_buf, DEF_RECV_BUFSZ))
     {
         btcp_errno = ERR_INIT_CQ_FAIL; 
         return -1;
@@ -659,7 +734,7 @@ static int btcp_try_send(struct btcp_tcpconn_handler *handler)
     range_list_to_send = g_list_append(NULL, range_to_send);
     
     GList *range_list_sent = NULL;
-    if (btcp_timeout_get_all_event(&handler->timeout, &range_list_sent) != 0)
+    if (btcp_timer_get_all_event(&handler->timeout, &range_list_sent) != 0)
     {
         btcp_errno = ERR_MEM_ERROR;
         goto btcp_try_send_out;
@@ -746,9 +821,9 @@ static int btcp_try_send(struct btcp_tcpconn_handler *handler)
             c_range.from = b_range.from % UINT32_MAX;
             c_range.to = b_range.to % UINT32_MAX;
 
-            if (btcp_timeout_add_event(&handler->timeout, 5, &c_range, sizeof(c_range), btcp_range_cmp))
+            if (btcp_timer_add_event(&handler->timeout, 5, &c_range, sizeof(c_range), btcp_range_cmp))
             {
-                g_error("登记定时器失败， btcp_timeout_add_event() failed!\n");
+                g_error("登记定时器失败， btcp_timer_add_event() failed!\n");
                 break;
             }
 
@@ -771,7 +846,7 @@ static int btcp_check_send_timeout(struct btcp_tcpconn_handler *handler)
     struct btcp_range e;
     int len = sizeof(struct btcp_range);
     int timeout_occur = 0;
-    while ( btcp_timeout_check(&handler->timeout, &e, &len) == 1)
+    while ( btcp_timer_check(&handler->timeout, &e, &len) == 1)
     {
         g_info("ack timeout, [%llu, %llu]\n", e.from, e.to);
         timeout_occur = 1; //有超时发生
@@ -997,5 +1072,42 @@ int btcp_tcpsrv_new_loop_thread(struct btcp_tcpsrv_handler * srv)
 
 GList *  btcp_tcpsrv_get_all_connections(struct btcp_tcpsrv_handler * srv)
 {
-    return NULL;
+    GList * result = NULL;
+    // 遍历哈希表
+    GHashTableIter iter;
+    gpointer key, value;
+    g_hash_table_iter_init(&iter, srv->all_connections);
+    while (g_hash_table_iter_next(&iter, &key, &value)) {
+
+        if (((struct btcp_tcpconn_handler *)value)->status != ESTABLISHED)
+        {
+            continue;
+        }
+        
+        struct btcp_tcpconn_handler *conn = (struct btcp_tcpconn_handler *)malloc(sizeof(struct btcp_tcpconn_handler));
+        if (conn == NULL)
+        {
+            btcp_errno = ERR_MEM_ERROR;
+            break;
+        }
+        memcpy(conn, value, sizeof(struct btcp_tcpconn_handler *));
+        result = g_list_insert(result, conn, 0);
+    }
+    return result;
+}
+
+static void free_one_conn(gpointer data) {
+    struct btcp_tcpconn_handler * conn = (struct btcp_tcpconn_handler *)data;
+    if (conn != NULL) {
+        free(conn);
+    }
+}
+
+void btcp_free_conns_in_glist(GList * conns)
+{
+    for (const GList *iter = conns; iter != NULL; iter = iter->next) {
+        struct btcp_tcpconn_handler *conn = (struct btcp_tcpconn_handler *)iter->data;
+        free(conn);
+    }
+    g_list_free(conns);
 }

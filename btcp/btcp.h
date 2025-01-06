@@ -12,7 +12,7 @@
 #include <unistd.h>
 #include "btcp_send_queue.h"
 #include "btcp_timeout.h"
-#include "circular_queue.h"
+#include "btcp_recv_queue.h"
 #include <glib.h>
 
 extern int btcp_errno;
@@ -67,6 +67,8 @@ struct btcp_tcpconn_handler
     int cong_wnd;
     int cong_wnd_threshold;
 
+    int repeat_ack;
+
     int mss;
     uint32_t local_seq; //发送窗口（允许未被确认的字节段）的第一个字节编号
     uint32_t peer_seq; //期望收到对端发的顺序包的起始sequence，
@@ -74,7 +76,8 @@ struct btcp_tcpconn_handler
     int peer_port;
     enum btcp_tcpconn_status status;
     
-    btcp_circular_queue recv_buf;
+    struct btcp_recv_queue recv_buf; //接收缓冲区
+    
 
     struct btcp_send_queue send_buf;
     struct btcp_timeout timeout; //发送的报文的超时控制
@@ -142,7 +145,10 @@ int btcp_tcpsrv_listen(const char * ip, short int port, struct btcp_tcpsrv_handl
 int btcp_tcpcli_connect(const char * ip, short int port, struct btcp_tcpconn_handler * handler);
 int btcp_tcpcli_new_loop_thread(struct btcp_tcpconn_handler *handler); 
 int btcp_tcpsrv_new_loop_thread(struct btcp_tcpsrv_handler * srv);
+//获取服务器所有已经建联的 btcp_tcpconn_handler
 GList *  btcp_tcpsrv_get_all_connections(struct btcp_tcpsrv_handler * srv);
+//释放保存了的 btcp_tcpconn_handler的GList，也会释放每个元素
+void btcp_free_conns_in_glist(GList * conns); 
 
 
 #endif

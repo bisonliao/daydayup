@@ -69,7 +69,8 @@ struct btcp_tcpconn_handler
     int cong_wnd_threshold;
 
     int repeat_ack;
-    int alive_time_stamp; //保活时间戳 记录本连接最后一次活跃时刻
+    time_t alive_time_stamp; //保活时间戳 记录本连接最后一次活跃时刻
+    time_t keepalive_request_time; //上一次发送keepalive请求的时间，记录下来避免频繁发送
 
     int mss;
     uint32_t local_seq; //发送窗口（允许未被确认的字节段）的第一个字节编号

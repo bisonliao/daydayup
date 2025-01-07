@@ -23,6 +23,7 @@ int main(int argc, char** argv)
     }
     g_info("in main(), peer ip:%s, mss:%d, peer_port:%d\n", handler.peer_ip, handler.mss, handler.peer_port);
     btcp_tcpcli_new_loop_thread(&handler);
+    
     while (1)
     {
         if (handler.status != ESTABLISHED)
@@ -38,9 +39,9 @@ int main(int argc, char** argv)
         {
             buf[i] = 'a'+i;
         }
-        //int iret = write(handler.user_socket_pair[0], buf, sz);
-        //printf("write %d bytes into engine, %u\n", iret, &handler);
-        usleep(1000000);
+        int iret = write(handler.user_socket_pair[0], buf, sz);
+        printf("write %d bytes into engine, %u\n", iret, &handler);
+        usleep(1000000* 10);
     }
     return 0;
 }

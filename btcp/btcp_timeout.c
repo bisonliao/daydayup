@@ -31,26 +31,28 @@ int btcp_timer_check(struct btcp_timeout *handler, void *event, int *len) {
     if (current == NULL || current->expire_time > current_time) {
         return 0;  // 没有超时的事件
     }
-    if (current->event_len > *len)
-    {
-        return -1;
-    }
-
+    g_assert(current->event_len == *len);
+    g_assert(current->event_data != NULL);
+    
+    
     // 返回超时的事件
     memcpy(event, current->event_data, current->event_len);
     *len = current->event_len;
 
     // 从链表中移除该事件
     handler->head = current->next;
-    free(current->event_data);  // 释放事件数据
-    free(current);
+    //todo:下面两行free代码会导致crash，还没有搞清楚怎么回事，先注释掉
+    //free(current->event_data);  // 释放事件数据
+    //free(current);
 
     return 1;
 }
 
 // 插入一个未来超时的事件
-int btcp_timer_add_event(struct btcp_timeout *handler, int sec, void *event, int len, int (*event_cmp)(void *, int, void *, int)) {
+int btcp_timer_add_event(struct btcp_timeout *handler, int sec, const void *event, int len, int (*event_cmp)(const void *, int, const void *, int)) {
     time_t expire_time = time(NULL) + sec;  // 计算超时时间
+
+    g_assert(len == sizeof(struct btcp_range));
 
     // 不管三七二十一，先尝试删除再插入，保证有序
     btcp_timer_remove_event(handler, event, len, event_cmp);
@@ -93,6 +95,7 @@ int btcp_timer_add_event(struct btcp_timeout *handler, int sec, void *event, int
 }
 int  btcp_timer_get_all_event(struct btcp_timeout *handler, GList **result)
 {
+    
     GList * tmp_result = NULL;
     struct btcp_timer_event *current = handler->head;
     
@@ -115,7 +118,7 @@ int  btcp_timer_get_all_event(struct btcp_timeout *handler, GList **result)
 }
 
 // 删除指定事件
-int btcp_timer_remove_event(struct btcp_timeout *handler, void *event, int len, int (*event_cmp)(void *, int, void *, int)) {
+int btcp_timer_remove_event(struct btcp_timeout *handler, const void *event, int len, int (*event_cmp)(const void *, int, const void *, int)) {
     struct btcp_timer_event *current = handler->head;
     struct btcp_timer_event *prev = NULL;
 

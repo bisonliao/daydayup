@@ -15,7 +15,8 @@ static int calc_step(struct btcp_recv_queue *queue, uint64_t position, uint64_t 
     else {step = btcp_sequence_round_out(position) - queue->expected_seq ;}
     if ( (step+1) > btcp_recv_queue_get_available_space(queue))
     {
-        fprintf(stderr, "fatal error! %s %d\n", __FILE__, __LINE__);
+        fprintf(stderr, "fatal error! %s %d, %llu, %d, %llu, %u\n", __FILE__, __LINE__,
+                step, btcp_recv_queue_get_available_space(queue), position, queue->expected_seq);
         return -1;
     }
     *result = step;
@@ -168,7 +169,17 @@ int btcp_recv_queue_save_data(struct btcp_recv_queue *queue, uint64_t from, uint
 }
 int btcp_recv_queue_try_move_wnd(struct btcp_recv_queue *queue)
 {
+
     GList *result;
+
+   
+
+#ifdef _P_
+    printf("rcvd segment:\n");
+    btcp_range_print_list(queue->rcvd_range_list);
+    printf("wnd start seq:%u\n", queue->expected_seq);
+#endif
+
     btcp_range_list_combine(queue->rcvd_range_list, &result);
     if (result == NULL)
     {
@@ -177,14 +188,19 @@ int btcp_recv_queue_try_move_wnd(struct btcp_recv_queue *queue)
     btcp_range_free_list(queue->rcvd_range_list);
     queue->rcvd_range_list = result;
 
-    int len = g_list_length(queue->rcvd_range_list);
+#ifdef _P_
+    printf("after combined,rcvd segment:\n");
+    btcp_range_print_list(queue->rcvd_range_list);
+#endif
+
+    //int len = g_list_length(queue->rcvd_range_list);
 
     GList *iter = queue->rcvd_range_list;
     
     while ( iter != NULL)
     {
         struct btcp_range *range = (struct btcp_range *)iter->data;
-        if (range->from == queue->expected_seq)
+        if (range->from == queue->expected_seq) //收到了一段紧接着 expected_seq 的数据
         {
             //move wnd
             uint64_t steps =  range->to - range->from + 1;
@@ -193,10 +209,20 @@ int btcp_recv_queue_try_move_wnd(struct btcp_recv_queue *queue)
                 fprintf(stderr, "fatal error! %s %d\n", __FILE__, __LINE__);
                 return -1;
             }
+#ifdef _P_
+            printf("move wnd, steps=%llu, [%llu, %llu]\n", steps, range->from, range->to);
+            printf("before move, expected_seq:%u, tail:%d, size:%d\n", queue->expected_seq, 
+                                                queue->tail,
+                                                queue->size); 
+#endif
             queue->expected_seq = btcp_sequence_round_in(range->to+1) ;
             queue->tail = (queue->tail + steps) % (queue->capacity);
             queue->size += steps;
-
+#ifdef _P_
+            printf("after move, expected_seq:%u, tail:%d, size:%d\n", queue->expected_seq, 
+                                                queue->tail,
+                                                queue->size); 
+#endif
             //删除当前元素，有点小技巧
             GList * next = iter->next;
             queue->rcvd_range_list = g_list_delete_link(queue->rcvd_range_list, iter); 
@@ -208,9 +234,18 @@ int btcp_recv_queue_try_move_wnd(struct btcp_recv_queue *queue)
         }
         else
         {
+#ifdef _P_
+            printf("GAP! [%llu, %llu]\n", range->from, range->to);
+#endif
             iter = iter->next;
         }
     }
+#ifdef _P_
+    printf("after move,rcvd segment:\n");
+    btcp_range_print_list(queue->rcvd_range_list);
+#endif
+
+#undef _P_
 
 }
 

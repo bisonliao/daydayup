@@ -31,10 +31,12 @@ void btcp_timer_destroy(struct btcp_timeout *handler);
 int btcp_timer_check(struct btcp_timeout *handler, void *event, int *len);
 
 // 插入一个未来超时的事件
-int btcp_timer_add_event(struct btcp_timeout *handler, int sec, void *event, int len, int (*event_cmp)(void *, int, void *, int));
+int btcp_timer_add_event(struct btcp_timeout *handler, int sec, const void *event, int len, 
+                    int (*event_cmp)(const void *, int, const void *, int));
 
 // 删除指定事件
-int btcp_timer_remove_event(struct btcp_timeout *handler, void *event, int len, int (*event_cmp)(void *, int, void *, int));
+int btcp_timer_remove_event(struct btcp_timeout *handler, const void *event, int len, 
+                        int (*event_cmp)(const void *, int, const void *, int));
 
 //遍历得到所有事件，保存在result里
 int  btcp_timer_get_all_event(struct btcp_timeout *handler, GList **result);

@@ -181,7 +181,7 @@ void btcp_range_free_list(GList *list) {
     g_list_free(list);  // 释放链表
 }
 
-int btcp_range_cmp(void *a, int a_len, void *b, int b_len)
+int btcp_range_cmp(const void *a, int a_len, const void *b, int b_len)
 {
     struct btcp_range * aa = (struct btcp_range * )a;
     struct btcp_range * bb = (struct btcp_range * )b;

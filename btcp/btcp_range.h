@@ -30,6 +30,6 @@ Combined result: [1, 12]
 // 把列表里的有重叠或者连续的range都合并
 int btcp_range_list_combine(GList *a, GList **result) ;
 
-int btcp_range_cmp(void *, int, void *, int);
+int btcp_range_cmp(const void *, int, const void *, int);
 
 #endif // BTCP_RANGE_H

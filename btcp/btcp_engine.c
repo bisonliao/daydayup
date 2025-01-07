@@ -162,7 +162,7 @@ struct btcp_tcpconn_handler *  btcp_handle_sync_rcvd1(char * bigbuffer,
             return NULL;
         }
         //测试用：
-        handler->mss = 10;
+        handler->mss = 5;
         if (!btcp_recv_queue_init(&handler->recv_buf, DEF_RECV_BUFSZ))
         {
             btcp_errno = ERR_INIT_CQ_FAIL;
@@ -181,7 +181,7 @@ struct btcp_tcpconn_handler *  btcp_handle_sync_rcvd1(char * bigbuffer,
        
         handler->local_port = srv->local_port;
         
-        handler->local_seq = btcp_get_random();
+        handler->local_seq = btcp_get_random() % UINT16_MAX;
         
         handler->status = SYNC_RCVD;
         handler->udp_socket = srv->udp_socket;
@@ -462,6 +462,7 @@ int btcp_throw_data_to_user(struct btcp_tcpconn_handler * handler)
     }
     return 0;
 }
+
 int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_handler * handler, 
             const struct sockaddr_in * client_addr)
 {
@@ -485,7 +486,9 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
         return -1;
     }
     uint32_t ack_seq32 = ntohl(hdr->ack_seq);
-    uint32_t seq32 = ntohl(hdr->seq);    
+    uint32_t seq32 = ntohl(hdr->seq); 
+
+    
 
     int offset = btcp_get_tcphdr_offset(&hdr->doff_res_flags);
     
@@ -508,6 +511,17 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
         }
         
     }
+    //如果seq小于peer_seq且小的不多，可能是超时到达的报文，seq已经落后了，应该丢弃
+    if (seq32 < handler->peer_seq &&  
+        btcp_sequence_round_out(seq32) > ((uint64_t)102400 + handler->peer_seq ))
+    {
+        if (!got_keepalive_request)
+        {
+            g_error("invalid pkg at %s %d, %u,%u", __FILE__, __LINE__, seq32, handler->peer_seq);
+            return 0;
+        }
+        
+    }   
       
     if (data_len > 0)
     {
@@ -517,8 +531,13 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
         if (btcp_recv_queue_save_data(&handler->recv_buf, from_seq, to_seq,
                                       bigbuffer + offset))
         {
+            /*
+            // 还是不要返回失败，免得被攻击者利用
             btcp_errno = ERR_SEQ_MISMATCH;
             return -1;
+            */
+            g_error("invalid pkg at %s %d", __FILE__, __LINE__);
+            return 0;
         }
         g_info("data_len:%d, peer_seq:%u", data_len, handler->peer_seq);
         
@@ -652,7 +671,7 @@ int btcp_tcpcli_connect(const char * ip, short int port, struct btcp_tcpconn_han
         return -1;
     }
     //测试用：
-    handler->mss = 10;
+    handler->mss = 5;
     if (!btcp_recv_queue_init(&handler->recv_buf, DEF_RECV_BUFSZ))
     {
         btcp_errno = ERR_INIT_CQ_FAIL; 
@@ -679,7 +698,9 @@ int btcp_tcpcli_connect(const char * ip, short int port, struct btcp_tcpconn_han
         
         hdr->source = htons(handler->local_port);
         handler->peer_port = port;
-        handler->local_seq = btcp_get_random()%UINT16_MAX;
+        //handler->local_seq = btcp_get_random()%UINT16_MAX;
+        // todo: test
+        handler->local_seq = 35725;
         hdr->window = htons(DEF_RECV_BUFSZ);
         hdr->seq = htonl(handler->local_seq);
         btcp_set_tcphdr_flag(FLAG_SYN, &(hdr->doff_res_flags));
@@ -962,7 +983,7 @@ int btcp_try_send(struct btcp_tcpconn_handler *handler)
             }
             else
             {
-                g_info("package lost![%llu, %llu]", b_range.from, b_range.to);
+                g_info("package lost![%llu, %llu]", b_range.from, b_range.from + datalen - 1);
                 sent_len = offset;
             }
             //g_info("sent successfully, len:%d\n", sent_len);
@@ -971,7 +992,8 @@ int btcp_try_send(struct btcp_tcpconn_handler *handler)
             c_range.from = btcp_sequence_round_in(b_range.from);
             c_range.to =  btcp_sequence_round_in(b_range.from + datalen - 1);   
 
-            if (btcp_timer_add_event(&handler->timeout, 5, &c_range, sizeof(c_range), btcp_range_cmp))
+            if (btcp_timer_add_event(&handler->timeout, 5, &c_range, sizeof(struct btcp_range), 
+                                        btcp_range_cmp))
             {
                 g_error("登记定时器失败， btcp_timer_add_event() failed!\n");
                 break;

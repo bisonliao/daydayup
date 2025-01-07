@@ -445,6 +445,21 @@ uint32_t btcp_sequence_step_forward(uint32_t original, uint32_t steps)
     tmp_seq += steps;
     return tmp_seq % ((uint64_t)1 + UINT32_MAX);
 }
+uint32_t btcp_sequence_step_back(uint32_t original, uint32_t steps)
+{
+    if (original < steps) // 不够减
+    {
+        uint64_t result =  (uint64_t)original + UINT32_MAX + 1 - steps;
+        return btcp_sequence_round_in(result);
+    }
+    else
+    {
+        return original - steps;
+    }
+    uint64_t tmp_seq = original;
+    tmp_seq += steps;
+    return tmp_seq % ((uint64_t)1 + UINT32_MAX);
+}
     
 
 

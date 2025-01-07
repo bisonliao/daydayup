@@ -63,12 +63,13 @@ struct btcp_tcpconn_handler
     char peer_ip[INET_ADDRSTRLEN];
     char local_ip[INET_ADDRSTRLEN];
 
-    int my_recv_wnd_sz;
+    int local_recv_wnd_sz;
     int peer_recv_wnd_sz;
     int cong_wnd;
     int cong_wnd_threshold;
 
     int repeat_ack;
+    int alive_time_stamp; //保活时间戳 记录本连接最后一次活跃时刻
 
     int mss;
     uint32_t local_seq; //发送窗口（允许未被确认的字节段）的第一个字节编号
@@ -146,7 +147,7 @@ int btcp_tcpcli_connect(const char * ip, short int port, struct btcp_tcpconn_han
 int btcp_tcpcli_new_loop_thread(struct btcp_tcpconn_handler *handler); 
 int btcp_tcpsrv_new_loop_thread(struct btcp_tcpsrv_handler * srv);
 //获取服务器所有已经建联的 btcp_tcpconn_handler
-GList *  btcp_tcpsrv_get_all_connections(struct btcp_tcpsrv_handler * srv);
+GList *  btcp_tcpsrv_get_all_connections(struct btcp_tcpsrv_handler * srv, int * status);
 //释放保存了的 btcp_tcpconn_handler的GList，也会释放每个元素
 void btcp_free_conns_in_glist(GList * conns); 
 

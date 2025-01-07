@@ -16,13 +16,14 @@
 该文档定义引擎内部使用的一些函数和符号，不暴露给开发者
 */
 
-#if 0
+#define MAX_CONN_ALLOWED (100000)
+
+#if 1
 
 
 //服务端收到建联请求1
-int btcp_handle_sync_rcvd1(char * bigbuffer,   
-                            struct btcp_tcpsrv_handler* srv, 
-                            const struct sockaddr_in * client_addr);
+struct btcp_tcpconn_handler *  btcp_handle_sync_rcvd1(char * bigbuffer, 
+            struct btcp_tcpsrv_handler* srv, const struct sockaddr_in * client_addr);
 //服务端收到建联请求2
 int btcp_handle_sync_rcvd2(char * bigbuffer,  struct btcp_tcpconn_handler * handler, 
                         const struct sockaddr_in * client_addr);
@@ -39,6 +40,15 @@ int btcp_check_send_timeout(struct btcp_tcpconn_handler *handler);
 
 // 尝试发送 发送缓冲区里的数据
 int btcp_try_send(struct btcp_tcpconn_handler *handler);
+
+int btcp_keep_alive(struct btcp_tcpconn_handler *handler, char *bigbuffer, bool is_server);
+
+int btcp_throw_data_to_user(struct btcp_tcpconn_handler * handler);
+
+int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_handler * handler, 
+            const struct sockaddr_in * client_addr);
+
+int btcp_destroy_tcpconn(struct btcp_tcpconn_handler *handler, bool is_server);
 #endif
 
 

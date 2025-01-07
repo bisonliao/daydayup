@@ -27,15 +27,18 @@ int main(int argc, char** argv)
     {
         if (handler.status != ESTABLISHED)
         {
-            printf("waiting...\n");
+            //printf("waiting...\n");
             usleep(1000);
             continue;
         }
         char buf[1024];
-        ssize_t sz = 100;
+        ssize_t sz = 26;
         //sz = read(0, buf, sizeof(buf));
-        memset(buf, 'A', sz);
-        int iret = write(handler.user_socket_pair[0], buf, sz);
+        for (int i = 0; i < sz; ++i)
+        {
+            buf[i] = 'a'+i;
+        }
+        //int iret = write(handler.user_socket_pair[0], buf, sz);
         //printf("write %d bytes into engine, %u\n", iret, &handler);
         usleep(1000000);
     }

@@ -25,6 +25,8 @@ uint32_t btcp_sequence_round_in(uint64_t original);
 uint64_t btcp_sequence_round_out(uint32_t original);
 // 32bit sequence 增长steps，保持在32bit范围内
 uint32_t btcp_sequence_step_forward(uint32_t original, uint32_t steps);
+// 32bit sequence 减小steps，保持在32bit范围内
+uint32_t btcp_sequence_step_back(uint32_t original, uint32_t steps);
 
 
 #endif

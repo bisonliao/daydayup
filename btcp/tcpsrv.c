@@ -23,7 +23,8 @@ int main(int argc, char** argv)
     static char bigbuffer[100*1024];
     while (1)
     {
-        GList *conns = btcp_tcpsrv_get_all_connections(&srv);
+        int status = ESTABLISHED;
+        GList *conns = btcp_tcpsrv_get_all_connections(&srv, &status);
         if (conns != NULL)
         {
             struct pollfd pfd[1024];
@@ -32,8 +33,6 @@ int main(int argc, char** argv)
             for (iter = conns, i=0; iter != NULL && i < 1024; iter = iter->next, i++)
             {
                 const struct btcp_tcpconn_handler * handler = (const struct btcp_tcpconn_handler *)(iter->data);
-                g_info("in %s, socketpair:%d, %d", __FILE__,
-                        handler->user_socket_pair[0], handler->user_socket_pair[1]);
                 pfd[i].fd = handler->user_socket_pair[0];
                 pfd[i].events = POLLIN;
             }
@@ -41,7 +40,7 @@ int main(int argc, char** argv)
             
             
             int ret = poll(pfd, fd_num, 100); // 1 秒超时
-            printf("fd num:%d, poll return %d\n", fd_num, ret);
+            //printf("fd num:%d, poll return %d\n", fd_num, ret);
             if (ret > 0)
             {
                 for (i = 0; i < fd_num; ++i)
@@ -54,7 +53,7 @@ int main(int argc, char** argv)
                         if (received > 0)
                         {
                             bigbuffer[received] = 0;
-                            printf("%s", bigbuffer);
+                            printf("[%s]\n", bigbuffer);
                         }
                         else if (errno == EAGAIN || errno == EWOULDBLOCK)
                         {
@@ -68,7 +67,7 @@ int main(int argc, char** argv)
         }
         else
         {
-            printf("no established conns\n");
+            //printf("no established conns\n");
         }
         
         usleep(1000000);

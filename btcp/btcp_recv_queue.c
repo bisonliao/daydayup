@@ -2,18 +2,17 @@
 #include <stdio.h>
 #include <string.h>
 #include "btcp_range.h"
+#include "tool.h"
 
 
 
 static int calc_step(struct btcp_recv_queue *queue, uint64_t position, uint64_t *result)
 {
-    if (position > UINT32_MAX) 
-    {
-        position = position % ((uint64_t)1 + UINT32_MAX);
-    }
+    position = btcp_sequence_round_in(position);
+  
     uint64_t step;
     if (position >= queue->expected_seq) {step = position - queue->expected_seq;}
-    else {step = position + UINT32_MAX + 1 - queue->expected_seq ;}
+    else {step = btcp_sequence_round_out(position) - queue->expected_seq ;}
     if ( (step+1) > btcp_recv_queue_get_available_space(queue))
     {
         fprintf(stderr, "fatal error! %s %d\n", __FILE__, __LINE__);
@@ -194,9 +193,9 @@ int btcp_recv_queue_try_move_wnd(struct btcp_recv_queue *queue)
                 fprintf(stderr, "fatal error! %s %d\n", __FILE__, __LINE__);
                 return -1;
             }
-
-            queue->expected_seq = (range->to+1) % ((uint64_t)1+UINT32_MAX);
+            queue->expected_seq = btcp_sequence_round_in(range->to+1) ;
             queue->tail = (queue->tail + steps) % (queue->capacity);
+            queue->size += steps;
 
             //删除当前元素，有点小技巧
             GList * next = iter->next;
@@ -220,7 +219,7 @@ int btcp_recv_queue_set_expected_seq(struct btcp_recv_queue *queue, uint64_t sta
 {
     if (btcp_recv_queue_is_empty(queue))
     {
-        queue->expected_seq = start % ((uint64_t)1 + UINT32_MAX);
+        queue->expected_seq = btcp_sequence_round_in(start) ;
         return 0;
     }
     uint64_t step;
@@ -230,7 +229,7 @@ int btcp_recv_queue_set_expected_seq(struct btcp_recv_queue *queue, uint64_t sta
     }
     
     queue->tail = (queue->tail + step) % queue->capacity;
-    queue->expected_seq = ( queue->expected_seq + step) % ((uint64_t)1 + UINT32_MAX);
+    queue->expected_seq = btcp_sequence_round_in( queue->expected_seq + step) ;
     queue->size += step;
     return 0;
 }

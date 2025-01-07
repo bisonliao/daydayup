@@ -1,18 +1,17 @@
 #include "btcp_send_queue.h"
 #include <stdio.h>
 #include <string.h>
+#include "tool.h"
 
 
 
 static int calc_step(struct btcp_send_queue *queue, uint64_t position, uint64_t *result)
 {
-    if (position > UINT32_MAX) 
-    {
-        position = position % ((uint64_t)1 + UINT32_MAX);
-    }
+    position = btcp_sequence_round_in(position) ;
+    
     uint64_t step;
     if (position >= queue->start_seq) {step = position - queue->start_seq;}
-    else {step = position + UINT32_MAX + 1 - queue->start_seq ;}
+    else {step = btcp_sequence_round_out(position)  - queue->start_seq ;}
     if (step > queue->size)
     {
         fprintf(stderr, "fatal error! %s %d\n", __FILE__, __LINE__);
@@ -139,7 +138,7 @@ int btcp_send_queue_set_start_seq(struct btcp_send_queue *queue, uint64_t start)
 {
     if (btcp_send_queue_is_empty(queue))
     {
-        queue->start_seq = start % ((uint64_t)1 + UINT32_MAX);
+        queue->start_seq = btcp_sequence_round_in(start) ;
         return 0;
     }
     uint64_t step;
@@ -149,7 +148,7 @@ int btcp_send_queue_set_start_seq(struct btcp_send_queue *queue, uint64_t start)
     }
     
     queue->head = (queue->head + step) % queue->capacity;
-    queue->start_seq = ( queue->start_seq + step) % ((uint64_t)1 + UINT32_MAX);
+    queue->start_seq = btcp_sequence_round_in( queue->start_seq + step) ;
     queue->size -= step;
     return 0;
 }

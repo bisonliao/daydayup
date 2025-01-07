@@ -3,6 +3,7 @@
 #include <string.h>
 #include <time.h>
 #include "btcp_range.h"
+#include "tool.h"
 
 
 // 初始化超时控制器
@@ -105,7 +106,7 @@ int  btcp_timer_get_all_event(struct btcp_timeout *handler, GList **result)
         memcpy(e, current->event_data, current->event_len);
         if (e->from > e->to) //可能因为tcp sequence是32bit而发生了回绕，恢复成更好理解的值
         {
-            e->to = e->to + UINT32_MAX + 1;
+            e->to = btcp_sequence_round_out(e->to) ;
         }
         tmp_result = g_list_append(tmp_result, e);
     }
@@ -149,7 +150,7 @@ int btcp_timer_remove_range(struct btcp_timeout *handler, const struct btcp_rang
         struct btcp_range range_in_list = *(const struct btcp_range *)(current->event_data);
         if (range_in_list.to <range_in_list.from)
         {
-            range_in_list.to = range_in_list.to + UINT32_MAX + 1;
+            range_in_list.to = btcp_sequence_round_out(range_in_list.to );
         }
         if (range->from <= range_in_list.from && range->to >= range_in_list.to)
         {

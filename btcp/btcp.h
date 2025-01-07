@@ -14,6 +14,7 @@
 #include "btcp_timeout.h"
 #include "btcp_recv_queue.h"
 #include <glib.h>
+#include "tool.h"
 
 extern int btcp_errno;
 int btcp_get_route_mtu(const char *dest_ip);
@@ -133,10 +134,9 @@ int btcp_set_tcphdr_flag(enum btcp_tcphdr_flag flag, uint16_t * doff_res_flags);
 int btcp_set_tcphdr_offset(int offset, uint16_t * doff_res_flags);
 int btcp_get_tcphdr_offset(const uint16_t * doff_res_flags);
 
-int btcp_set_socket_nonblock(int sockfd);
-int btcp_is_readable(int sockfd, int to, char * bigbuffer, int buflen, struct sockaddr_in *client_addr);
 int btcp_get_port(const char*bigbuffer, unsigned short * dest, unsigned short *source);
 int btcp_print_tcphdr(const char*bigbuffer, const char * msg);
+
 
 
 

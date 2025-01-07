@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <time.h>
 #include "btcp.h"
+
 #include <fcntl.h>
 #include <poll.h>
 #include <sys/socket.h>
@@ -423,6 +424,26 @@ int btcp_check_udp_port_in_use(unsigned short port)
     // 绑定成功，端口未被占用
     close(sockfd);
     return 0;
+}
+
+uint32_t btcp_sequence_round_in(uint64_t original)
+{
+    uint64_t seq64 = original;
+    seq64 =  seq64 %((uint64_t)1+UINT32_MAX);
+    uint32_t seq32 = seq64;
+    return seq32;
+}
+
+uint64_t btcp_sequence_round_out(uint32_t original)
+{
+     return ((uint64_t)original) + UINT32_MAX + 1;
+}
+
+uint32_t btcp_sequence_step_forward(uint32_t original, uint32_t steps)
+{
+    uint64_t tmp_seq = original;
+    tmp_seq += steps;
+    return tmp_seq % ((uint64_t)1 + UINT32_MAX);
 }
     
 

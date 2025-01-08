@@ -42,8 +42,8 @@ int btcp_timer_check(struct btcp_timeout *handler, void *event, int *len) {
     // 从链表中移除该事件
     handler->head = current->next;
     //todo:下面两行free代码会导致crash，还没有搞清楚怎么回事，先注释掉
-    //free(current->event_data);  // 释放事件数据
-    //free(current);
+    free(current->event_data);  // 释放事件数据
+    free(current);
 
     return 1;
 }
@@ -155,9 +155,11 @@ int btcp_timer_remove_range(struct btcp_timeout *handler, const struct btcp_rang
         {
             range_in_list.to = btcp_sequence_round_out(range_in_list.to );
         }
+    // 这里删除是出过内存越界访问的bug的！
         if (range->from <= range_in_list.from && range->to >= range_in_list.to)
         {
             // 找到匹配的事件，从链表中移除
+            struct btcp_timer_event * tmp = current->next;
             if (prev == NULL) {
                 handler->head = current->next;
             } else {
@@ -167,6 +169,9 @@ int btcp_timer_remove_range(struct btcp_timeout *handler, const struct btcp_rang
             // 释放事件数据和节点
             free(current->event_data);
             free(current);
+
+            current = tmp;
+            continue;
         }
 
         prev = current;
@@ -182,10 +187,11 @@ int btcp_timer_remove_by_from(struct btcp_timeout *handler, uint32_t from)
 
     while (current != NULL) {
         struct btcp_range range_in_list = *(const struct btcp_range *)(current->event_data);
-        
+        // 这里删除是出过内存越界访问的bug的！
         if (range_in_list.from == from)
         {
             // 找到匹配的事件，从链表中移除
+            struct btcp_timer_event * tmp = current->next;
             if (prev == NULL) {
                 handler->head = current->next;
             } else {
@@ -195,6 +201,9 @@ int btcp_timer_remove_by_from(struct btcp_timeout *handler, uint32_t from)
             // 释放事件数据和节点
             free(current->event_data);
             free(current);
+
+            current = tmp;
+            continue;
         }
 
         prev = current;

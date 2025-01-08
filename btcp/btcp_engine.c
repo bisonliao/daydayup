@@ -56,9 +56,11 @@ static void btcp_tcpconn_key_destroy(gpointer key) {
 
 // 释放值的函数
 static void btcp_tcpconn_value_destroy(gpointer value) {
-   struct btcp_tcpconn_handler* v = (struct btcp_tcpconn_handler*)value;
-   g_info("Destroying value: ip=%s, port=%d", v->peer_ip, v->peer_port);
     // 注意：如果键和值是同一个指针，这里不需要释放内存， 也不需要做 btcp_destroy_tcpconn
+    // 这死后都不应该访问value了，读都不行。这里是出过内存越界访问的bug的！
+   struct btcp_tcpconn_handler* v = (struct btcp_tcpconn_handler*)value;
+   //g_info("Destroying value: ip=%s, port=%d", v->peer_ip, v->peer_port);
+    
 }
 
 
@@ -319,7 +321,7 @@ int btcp_handle_ack(union btcp_tcphdr_with_option *tcphdr, struct btcp_tcpconn_h
     
     if (ack_seq64 > (handler->local_seq + 65535)) // 大太多了，就算是累计确认也不能差这么多
     {
-        g_error("ack sequence is too big! %u, %u", ack_seq32, handler->local_seq);
+        g_warning("ack sequence is too big! %u, %u", ack_seq32, handler->local_seq);
         return -1;
     }
     if (handler->local_seq == ack_seq32) // 收到对当前sequence的重复确认
@@ -440,7 +442,7 @@ int btcp_throw_data_to_user(struct btcp_tcpconn_handler * handler)
     int size = btcp_recv_queue_size(&handler->recv_buf);
     if (size <= 0)
     {
-        g_error("unexpected data size! %d, %s %d", size, __FILE__, __LINE__);
+        g_warning("unexpected data size! %d, %s %d", size, __FILE__, __LINE__);
         return 0;
     }
     unsigned char buf[1024];
@@ -456,7 +458,7 @@ int btcp_throw_data_to_user(struct btcp_tcpconn_handler * handler)
         int written = write(handler->user_socket_pair[1], buf, len);
         if (written!= len)
         {
-            g_error("write user socket pair failed!%d, (%s, %d)", written, __FILE__, __LINE__);
+            g_warning("write user socket pair failed!%d, (%s, %d)", written, __FILE__, __LINE__);
         }
         g_info("thow %d bytes data to users", written);
     }
@@ -511,13 +513,14 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
         }
         
     }
-    //如果seq小于peer_seq且小的不多，可能是超时到达的报文，seq已经落后了，应该丢弃
+    //收到报文不在接收窗口内，又不是keep alive报文，那就直接丢弃。
+    // 这类非法报文，可能是在途超时到达的老报文或者恶意者攻击
     if (seq32 < handler->peer_seq &&  
-        btcp_sequence_round_out(seq32) > ((uint64_t)102400 + handler->peer_seq ))
+        btcp_sequence_round_out(seq32) -handler->peer_seq > handler->local_recv_wnd_sz)
     {
         if (!got_keepalive_request)
         {
-            g_error("invalid pkg at %s %d, %u,%u", __FILE__, __LINE__, seq32, handler->peer_seq);
+            g_warning("invalid pkg at %s %d, %u,%u", __FILE__, __LINE__, seq32, handler->peer_seq);
             return 0;
         }
         
@@ -536,7 +539,7 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
             btcp_errno = ERR_SEQ_MISMATCH;
             return -1;
             */
-            g_error("invalid pkg at %s %d", __FILE__, __LINE__);
+            g_warning("invalid pkg at %s %d", __FILE__, __LINE__);
             return 0;
         }
         g_info("data_len:%d, peer_seq:%u", data_len, handler->peer_seq);
@@ -547,7 +550,7 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
             int steps = btcp_recv_queue_try_move_wnd(&handler->recv_buf);
             if (steps < 0)
             {
-                g_error("btcp_recv_queue_try_move_wnd() failed! %d", steps);
+                g_warning("btcp_recv_queue_try_move_wnd() failed! %d", steps);
                 btcp_errno = ERR_SEQ_MISMATCH;
                 return -1;
             }
@@ -946,7 +949,7 @@ int btcp_try_send(struct btcp_tcpconn_handler *handler)
             }
             if (btcp_send_queue_fetch_data(&handler->send_buf, b_range.from, b_range.from + datalen - 1, bigbuffer+sizeof(struct btcp_tcphdr)))
             {
-                g_error("!!!btcp_send_queue_fetch_data() failed\n");
+                g_warning("!!!btcp_send_queue_fetch_data() failed\n");
                 break;
             }
             g_info("send a tcp package[%llu, %llu]\n", b_range.from, b_range.from + datalen - 1);
@@ -995,9 +998,10 @@ int btcp_try_send(struct btcp_tcpconn_handler *handler)
             if (btcp_timer_add_event(&handler->timeout, 5, &c_range, sizeof(struct btcp_range), 
                                         btcp_range_cmp))
             {
-                g_error("登记定时器失败， btcp_timer_add_event() failed!\n");
+                g_warning("btcp_timer_add_event() failed!\n");
                 break;
             }
+            g_info("add to timer:[%llu, %llu]", c_range.from, c_range.to);
 
             b_range.from += datalen;
         }
@@ -1022,6 +1026,7 @@ int btcp_check_send_timeout(struct btcp_tcpconn_handler *handler)
     {
         g_info("ack timeout, [%llu, %llu]\n", e.from, e.to);
         timeout_occur = 1; //有超时发生
+        len = sizeof(struct btcp_range);
     }
     if (timeout_occur)
     {
@@ -1232,7 +1237,7 @@ static void* btcp_tcpsrv_loop(void * arg)
                 }
                 if (!g_hash_table_insert(srv->all_connections, conn, conn)) // 键值都是conn，注意。
                 {
-                    g_error("!!!g_hash_table_insert() failed");
+                    g_warning("!!!g_hash_table_insert() failed");
                     continue;
                 }
             }
@@ -1251,7 +1256,8 @@ static void* btcp_tcpsrv_loop(void * arg)
                 if (btcp_handle_data_rcvd(bigbuffer, pkg_len, conn, &client_addr))
                 {
                     fprintf(stderr, "btcp_handle_data_rcvd() failed! %d\n", btcp_errno);
-                    struct btcp_tcpconn_handler * removed =  (struct btcp_tcpconn_handler *)g_hash_table_remove(srv->all_connections, &key); // close the connn // close the connn
+                    // 这里还是不删除比较好，避免恶意者攻击
+                    //struct btcp_tcpconn_handler * removed =  (struct btcp_tcpconn_handler *)g_hash_table_remove(srv->all_connections, &key); // close the connn // close the connn
                     
                 }
             }

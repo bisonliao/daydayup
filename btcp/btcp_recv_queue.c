@@ -12,11 +12,12 @@ static int calc_step(struct btcp_recv_queue *queue, uint64_t position, uint64_t 
   
     uint64_t step;
     if (position >= queue->expected_seq) {step = position - queue->expected_seq;}
-    else {step = btcp_sequence_round_out(position) - queue->expected_seq ;}
+    else {step = btcp_sequence_round_out((uint32_t)position) - queue->expected_seq ;}
     if ( (step+1) > btcp_recv_queue_get_available_space(queue))
     {
         fprintf(stderr, "fatal error! %s %d, %llu, %d, %llu, %u\n", __FILE__, __LINE__,
                 step, btcp_recv_queue_get_available_space(queue), position, queue->expected_seq);
+    //fatal error! btcp_recv_queue.c 18, 4294967295, 4096, 35751, 35752
         return -1;
     }
     *result = step;

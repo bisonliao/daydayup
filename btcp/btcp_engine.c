@@ -26,24 +26,7 @@ static gboolean btcp_tcpconn_equal(gconstpointer a, gconstpointer b) {
     return conn1->peer_port == conn2->peer_port && 
         strncmp(conn1->peer_ip, conn2->peer_ip, INET_ADDRSTRLEN)==0;
 }
-/*
-在 GLib 的 GHashTable 中，g_hash_table_new_full() 指定的释放函数（key_destroy_func 和 value_destroy_func）不会在 g_hash_table_remove() 执行时被自动调用。这些释放函数只会在以下情况下被调用：
 
-哈希表被销毁时（调用 g_hash_table_destroy()）：
-
-哈希表中所有剩余的键值对会被释放，key_destroy_func 和 value_destroy_func 会被调用。
-
-键被替换时（调用 g_hash_table_insert() 或 g_hash_table_replace() 插入一个已存在的键）：
-
-如果插入的键已经存在，旧的键值对会被替换，key_destroy_func 和 value_destroy_func 会被调用以释放旧的键和值。
-
-g_hash_table_remove() 的行为
-g_hash_table_remove() 只会从哈希表中移除键值对，并返回被移除的值。
-
-它不会调用 key_destroy_func 或 value_destroy_func。
-
-如果键和值是动态分配的内存，你需要手动释放它们。
-*/
 // 释放键的函数
 static void btcp_tcpconn_key_destroy(gpointer key) {
 
@@ -61,6 +44,17 @@ static void btcp_tcpconn_value_destroy(gpointer value) {
    struct btcp_tcpconn_handler* v = (struct btcp_tcpconn_handler*)value;
    //g_info("Destroying value: ip=%s, port=%d", v->peer_ip, v->peer_port);
     
+}
+
+//发送报文后，超时时间设置为多少
+int btcp_get_timeout_sec(struct btcp_tcpconn_handler *handler)
+{
+    int v = handler->rtt.current_rtt_msec * 5 / 1000; // 5个rtt
+    if (v <= 1 || v > 5)
+    {
+        v = 2; //设置为1不合适，因为当前定时器的精度是秒级别的，1的话可能很快就超时了，只要系统时间的秒发生了变化
+    }
+    return v;
 }
 
 
@@ -177,8 +171,9 @@ struct btcp_tcpconn_handler *  btcp_handle_sync_rcvd1(char * bigbuffer,
             free(handler);
             return NULL;
         }
+        btcp_rtt_init(&handler->rtt);
+        btcp_timer_init(&handler->timeout);
         handler->cong_wnd = 1;
-        handler->local_recv_wnd_sz = DEF_RECV_BUFSZ;
 
        
         handler->local_port = srv->local_port;
@@ -223,7 +218,8 @@ struct btcp_tcpconn_handler *  btcp_handle_sync_rcvd1(char * bigbuffer,
     hdr->dest = htons(handler->peer_port);
     hdr->source = htons(handler->local_port);
     hdr->seq = htonl(handler->local_seq);
-    hdr->window = htons(DEF_RECV_BUFSZ);
+    int recv_wndsz = btcp_recv_queue_get_available_space(&handler->recv_buf);
+    hdr->window = htons(recv_wndsz);
     
     offset = sizeof(struct btcp_tcphdr);
     btcp_set_tcphdr_offset(offset, &hdr->doff_res_flags);
@@ -318,6 +314,8 @@ int btcp_handle_ack(union btcp_tcphdr_with_option *tcphdr, struct btcp_tcpconn_h
     {
         ack_seq64 = btcp_sequence_round_out(ack_seq32);
     }
+
+    btcp_rtt_update_rtt(&handler->rtt, ack_seq32);
     
     if (ack_seq64 > (handler->local_seq + 65535)) // 大太多了，就算是累计确认也不能差这么多
     {
@@ -408,7 +406,8 @@ int btcp_handle_ack(union btcp_tcphdr_with_option *tcphdr, struct btcp_tcpconn_h
             hdr->dest = htons(handler->peer_port);
             hdr->source = htons(handler->local_port);
             hdr->seq = htonl(btcp_sequence_step_back(handler->local_seq, 1));
-            hdr->window = htons(DEF_RECV_BUFSZ); // todo:修改为当前接收缓冲区实际的可用空间
+            int recv_wndsz = btcp_recv_queue_get_available_space(&handler->recv_buf);
+            hdr->window = htons(recv_wndsz); 
 
             int offset = sizeof(struct btcp_tcphdr);
             btcp_set_tcphdr_offset(offset, &hdr->doff_res_flags);
@@ -515,8 +514,9 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
     }
     //收到报文不在接收窗口内，又不是keep alive报文，那就直接丢弃。
     // 这类非法报文，可能是在途超时到达的老报文或者恶意者攻击
+    int recv_wndsz = btcp_recv_queue_get_available_space(&handler->recv_buf);
     if (seq32 < handler->peer_seq &&  
-        btcp_sequence_round_out(seq32) -handler->peer_seq > handler->local_recv_wnd_sz)
+        btcp_sequence_round_out(seq32) -handler->peer_seq > recv_wndsz)
     {
         if (!got_keepalive_request)
         {
@@ -525,7 +525,7 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
         }
         
     }   
-      
+    handler->peer_recv_wnd_sz = ntohs(hdr->window); 
     if (data_len > 0)
     {
         uint64_t from_seq = ntohl(hdr->seq);
@@ -579,8 +579,8 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
         hdr->dest = htons(handler->peer_port);
         hdr->source = htons(handler->local_port);
         hdr->seq = htonl(handler->local_seq);
-        hdr->window = htons(DEF_RECV_BUFSZ);// todo:修改为当前接收缓冲区实际的可用空间
-
+        int recv_wndsz = btcp_recv_queue_get_available_space(&handler->recv_buf);
+        hdr->window = htons(recv_wndsz);
         int offset = sizeof(struct btcp_tcphdr);
         btcp_set_tcphdr_offset(offset, &hdr->doff_res_flags);
 
@@ -685,9 +685,11 @@ int btcp_tcpcli_connect(const char * ip, short int port, struct btcp_tcpconn_han
         btcp_errno = ERR_INIT_CQ_FAIL; 
         return -1;
     }
+    btcp_rtt_init(&handler->rtt);
+    btcp_timer_init(&handler->timeout);
     handler->cong_wnd = 1;
     handler->cong_wnd_threshold = 8;
-    handler->local_recv_wnd_sz = DEF_RECV_BUFSZ;
+  
     
     if (btcp_tcpcli_init_udp(handler)) { return -1;}
     
@@ -701,10 +703,10 @@ int btcp_tcpcli_connect(const char * ip, short int port, struct btcp_tcpconn_han
         
         hdr->source = htons(handler->local_port);
         handler->peer_port = port;
-        //handler->local_seq = btcp_get_random()%UINT16_MAX;
-        // todo: test
-        handler->local_seq = 35725;
-        hdr->window = htons(DEF_RECV_BUFSZ);
+        handler->local_seq = btcp_get_random()%UINT16_MAX;
+        
+        int recv_wndsz = btcp_recv_queue_get_available_space(&handler->recv_buf);
+        hdr->window = htons(recv_wndsz);
         hdr->seq = htonl(handler->local_seq);
         btcp_set_tcphdr_flag(FLAG_SYN, &(hdr->doff_res_flags));
 
@@ -807,7 +809,8 @@ int btcp_handle_sync_sent(char * bigbuffer,  struct btcp_tcpconn_handler * handl
     hdr->dest = htons(handler->peer_port);
     hdr->source = htons(handler->local_port);
     hdr->seq = htonl(handler->local_seq);
-    hdr->window = htons(DEF_RECV_BUFSZ);
+    int recv_wndsz = btcp_recv_queue_get_available_space(&handler->recv_buf);
+    hdr->window = htons(recv_wndsz);
     
     offset = sizeof(struct btcp_tcphdr);
     btcp_set_tcphdr_offset(offset, &hdr->doff_res_flags);
@@ -936,7 +939,7 @@ int btcp_try_send(struct btcp_tcpconn_handler *handler)
     for (const GList *iter = combined_list; iter != NULL; iter = iter->next)
     {
         struct btcp_range *a_range = (struct btcp_range *)iter->data;
-        struct btcp_range b_range;
+        struct btcp_range b_range; // b_range的from to是 64bit 长范围的
         b_range.from = a_range->from;
         b_range.to = a_range->to;
         static unsigned char bigbuffer[100*1024];
@@ -959,7 +962,8 @@ int btcp_try_send(struct btcp_tcpconn_handler *handler)
             memset(hdr, 0, sizeof(struct btcp_tcphdr));
             hdr->dest = htons(handler->peer_port);
             hdr->source = htons(handler->local_port);
-            hdr->window = htons(DEF_RECV_BUFSZ);
+            int recv_wndsz = btcp_recv_queue_get_available_space(&handler->recv_buf);
+            hdr->window = htons(recv_wndsz);
             hdr->seq = htonl( btcp_sequence_round_in(b_range.from));
             int offset = sizeof(struct btcp_tcphdr);
             btcp_set_tcphdr_offset(offset, &hdr->doff_res_flags);
@@ -991,11 +995,12 @@ int btcp_try_send(struct btcp_tcpconn_handler *handler)
             }
             //g_info("sent successfully, len:%d\n", sent_len);
             // 记录超时事件, timer里记录的range的sequence都是32bit范围内的值，方便与ack报文的sequence对应
-            struct btcp_range c_range;
+            struct btcp_range c_range; // c_range是32bit短范围内的
             c_range.from = btcp_sequence_round_in(b_range.from);
             c_range.to =  btcp_sequence_round_in(b_range.from + datalen - 1);   
 
-            if (btcp_timer_add_event(&handler->timeout, 5, &c_range, sizeof(struct btcp_range), 
+            int sec = btcp_get_timeout_sec(handler);
+            if (btcp_timer_add_event(&handler->timeout, sec, &c_range, sizeof(struct btcp_range), 
                                         btcp_range_cmp))
             {
                 g_warning("btcp_timer_add_event() failed!\n");
@@ -1003,6 +1008,13 @@ int btcp_try_send(struct btcp_tcpconn_handler *handler)
             }
             g_info("add to timer:[%llu, %llu]", c_range.from, c_range.to);
 
+            if (c_range.from == handler->local_seq)
+            {
+                uint32_t expected_ack_seq = btcp_sequence_round_in(c_range.to+1);
+                btcp_rtt_add_send_record(&handler->rtt, expected_ack_seq);
+                g_info("add rec to rtt, ack seq:%u", expected_ack_seq);
+            }
+            
             b_range.from += datalen;
         }
     }
@@ -1061,8 +1073,8 @@ int btcp_destroy_tcpconn(struct btcp_tcpconn_handler *handler, bool is_server)
     btcp_recv_queue_destroy(&handler->recv_buf);
     btcp_send_queue_destroy(&handler->send_buf);
     btcp_timer_destroy(&handler->timeout);
-
-    
+    btcp_rtt_destroy(&handler->rtt);
+       
     return 0;
 
 }

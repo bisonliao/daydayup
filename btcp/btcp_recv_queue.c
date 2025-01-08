@@ -5,7 +5,7 @@
 #include "tool.h"
 
 
-
+// 计算 range的起止位置 position 距离quene的tail的步长，且确保步长不要超过队列空闲可写空间的范围
 static int calc_step(struct btcp_recv_queue *queue, uint64_t position, uint64_t *result)
 {
     position = btcp_sequence_round_in(position);
@@ -17,7 +17,7 @@ static int calc_step(struct btcp_recv_queue *queue, uint64_t position, uint64_t 
     {
         fprintf(stderr, "fatal error! %s %d, %llu, %d, %llu, %u\n", __FILE__, __LINE__,
                 step, btcp_recv_queue_get_available_space(queue), position, queue->expected_seq);
-    //fatal error! btcp_recv_queue.c 18, 4294967295, 4096, 35751, 35752
+    
         return -1;
     }
     *result = step;

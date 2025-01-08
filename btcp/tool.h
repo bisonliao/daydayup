@@ -28,5 +28,8 @@ uint32_t btcp_sequence_step_forward(uint32_t original, uint32_t steps);
 // 32bit sequence 减小steps，保持在32bit范围内
 uint32_t btcp_sequence_step_back(uint32_t original, uint32_t steps);
 
+//从系统启动开始的时间，不受系统时间更改影响，毫秒精度
+uint64_t btcp_get_monotonic_msec(); 
+
 
 #endif

@@ -49,6 +49,9 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
             const struct sockaddr_in * client_addr);
 
 int btcp_destroy_tcpconn(struct btcp_tcpconn_handler *handler, bool is_server);
+
+//发送报文后，超时时间设置为多少
+int btcp_get_timeout_sec(struct btcp_tcpconn_handler *handler);
 #endif
 
 

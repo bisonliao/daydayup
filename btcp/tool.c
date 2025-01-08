@@ -460,7 +460,17 @@ uint32_t btcp_sequence_step_back(uint32_t original, uint32_t steps)
     tmp_seq += steps;
     return tmp_seq % ((uint64_t)1 + UINT32_MAX);
 }
-    
+
+uint64_t btcp_get_monotonic_msec()
+{
+    struct timespec tp;
+    clock_gettime(CLOCK_MONOTONIC, &tp);
+
+    uint64_t result = (uint64_t)tp.tv_sec * 1000;
+    result += tp.tv_nsec / 1000000;
+
+    return  result;
+} 
 
 
 

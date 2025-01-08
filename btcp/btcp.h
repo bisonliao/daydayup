@@ -16,6 +16,8 @@
 #include <glib.h>
 #include "tool.h"
 
+#include "btcp_rtt.h"
+
 extern int btcp_errno;
 int btcp_get_route_mtu(const char *dest_ip);
 int btcp_alloc_local_port();
@@ -63,7 +65,7 @@ struct btcp_tcpconn_handler
     char peer_ip[INET_ADDRSTRLEN];
     char local_ip[INET_ADDRSTRLEN];
 
-    int local_recv_wnd_sz;
+    //int local_recv_wnd_sz; //这个字段不需要，直接从recv_buf获取可用空间即可
     int peer_recv_wnd_sz;
     int cong_wnd;
     int cong_wnd_threshold;
@@ -73,6 +75,7 @@ struct btcp_tcpconn_handler
     time_t keepalive_request_time; //上一次发送keepalive请求的时间，记录下来避免频繁发送
 
     int mss;
+    struct btcp_rtt_handler rtt;
     uint32_t local_seq; //发送窗口（允许未被确认的字节段）的第一个字节编号
     uint32_t peer_seq; //期望收到对端发的顺序包的起始sequence，
     int local_port;

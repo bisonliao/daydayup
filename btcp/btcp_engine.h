@@ -52,6 +52,11 @@ int btcp_destroy_tcpconn(struct btcp_tcpconn_handler *handler, bool is_server);
 
 //发送报文后，超时时间设置为多少
 int btcp_get_timeout_sec(struct btcp_tcpconn_handler *handler);
+
+int btcp_increase_cong_wnd(struct btcp_tcpconn_handler *handler);
+int btcp_shrink_cong_wnd(struct btcp_tcpconn_handler *handler, bool quick);
+
+
 #endif
 
 

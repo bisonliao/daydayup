@@ -3,7 +3,6 @@
 #include <err.h>
 #include <errno.h>
 #include <pthread.h>
-#include "btcp_range.h"
 #include <glib.h>
 #include <unistd.h>
 
@@ -41,7 +40,7 @@ int main(int argc, char** argv)
         }
         int iret = write(handler.user_socket_pair[0], buf, sz);
         printf("write %d bytes into engine, %u\n", iret, &handler);
-        usleep(1000000*1);
+        usleep(1000000*5);
     }
     return 0;
 }

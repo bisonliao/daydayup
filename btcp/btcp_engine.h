@@ -3,7 +3,7 @@
 
 #include "btcp.h"
 #include "btcp_timeout.h"
-#include "btcp_range.h"
+#include "tool.h"
 #include "btcp_send_queue.h"
 #include <unistd.h>
 #include <stdint.h>

@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "btcp_range.h"
 #include "tool.h"
 
 

@@ -15,6 +15,7 @@
 #include "btcp_recv_queue.h"
 #include <glib.h>
 #include "tool.h"
+#include "btcp_selective_ack_blocklist.h"
 
 #include "btcp_rtt.h"
 
@@ -82,6 +83,7 @@ struct btcp_tcpconn_handler
 
     int mss;
     struct btcp_rtt_handler rtt;
+    struct btcp_sack_blocklist sack;
     uint32_t local_seq; //发送窗口（允许未被确认的字节段）的第一个字节编号
     uint32_t peer_seq; //期望收到对端发的顺序包的起始sequence，
     int local_port;

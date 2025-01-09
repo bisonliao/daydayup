@@ -174,6 +174,7 @@ struct btcp_tcpconn_handler *  btcp_handle_sync_rcvd1(char * bigbuffer,
         }
         btcp_rtt_init(&handler->rtt);
         btcp_timer_init(&handler->timeout);
+        btcp_sack_blocklist_init(&handler->sack);
         handler->cong_wnd = 1;
 
        
@@ -407,7 +408,8 @@ int btcp_handle_ack(union btcp_tcphdr_with_option *tcphdr, struct btcp_tcpconn_h
     else
     {
         handler->repeat_ack = 0;
-
+        // todo:这里真的就信任网络上发过来的一个ack报文而直接修改seq吗？
+        // 是不是应该做一些检查和限制
         struct btcp_range range;
         range.from = handler->local_seq;
         range.to = ack_seq64-1; //闭区间，所以要减一， 这是一个bug被修复了
@@ -419,6 +421,29 @@ int btcp_handle_ack(union btcp_tcphdr_with_option *tcphdr, struct btcp_tcpconn_h
         btcp_timer_remove_range(&handler->timeout, &range);
 
         btcp_increase_cong_wnd(handler);
+    }
+    //继续处理selective ack的信息
+    {
+        int hdr_len = btcp_get_tcphdr_offset(&hdr->doff_res_flags);
+        if (hdr_len > sizeof(struct btcp_tcphdr))
+        {
+            int offset = sizeof(struct btcp_tcphdr);
+            uint8_t opt_kind = *(uint8_t*)(tcphdr->options+offset);
+            offset++;
+            uint8_t opt_len = *(uint8_t*)(tcphdr->options+offset);
+            offset++;
+            if (opt_kind == 5 && opt_len == 10)
+            {
+                struct btcp_range opt_range;
+                opt_range.from = ntohl(*(uint32_t*)(tcphdr->options+offset));
+                offset += 4;
+                opt_range.to   = ntohl(*(uint32_t*)(tcphdr->options+offset));
+                offset += 4;
+
+                btcp_sack_blocklist_add_record(&handler->sack, &opt_range);
+                g_info("get a sack block [%llu, %llu]", opt_range.from, opt_range.to);
+            }
+        }
     }
 
     
@@ -621,6 +646,9 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
     会发送三个ack，ack_seq都会等于100。发送端一段时间后就会发现p1, p2 p3都没有被ack而超时，这时候又
     重新发送p1 p2 p3。对端收到p1后立即移动接收窗口获得了完整的p1 p2 p3, sequence移动到p3报文的末尾字节
     位置，再接着收到重发的p2 p3，这时候的p2 p3是白白重复传输的。
+
+    优化方案可以使用SACK选项，即选择性ack，对端收到p2, p3后ack的时候，在首部选项字段里也带上对p2 p3的ack
+    发送端收到sack信息后，不再重复发送
     */
     int recv_wndsz = btcp_recv_queue_get_available_space(&handler->recv_buf);
     if (seq32 < handler->peer_seq &&  
@@ -633,6 +661,7 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
         }
         
     } 
+    unsigned char sack_option[10] = {0}; 
     handler->peer_recv_wnd_sz = ntohs(hdr->window); 
     if (data_len > 0)
     {
@@ -673,7 +702,28 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
                     handler->recv_buf.tail);
             //向应用层抛数据
             btcp_throw_data_to_user(handler);
-            
+        }
+        else
+        {
+            //准备一段selective ack option数据，追加到tcp首部里
+            /*
+            格式：
+            Kind: 5 one byte
+            Length: 可变（取决于 SACK 块的数量） on byte。
+            Value: 一个或多个 SACK 块，每个 SACK 块包含两个 32 位的序列号：
+                Left Edge：已接收数据块的起始序列号。
+                Right Edge：已接收数据块的结束序列号（即下一个期望的序列号）。
+            */
+            *(uint8_t*)(sack_option + 0) = 5; 
+            *(uint8_t*)(sack_option + 1) = 10;
+
+            uint32_t left = seq32;
+            *(uint32_t*)(sack_option + 2) = htonl(seq32);
+
+            uint32_t right = btcp_sequence_round_in((uint64_t)seq32+data_len-1);
+            *(uint32_t*)(sack_option + 6) = htonl(right);
+
+            g_info("send a sack block[%u, %u]", left, right);
         }
     }
     //如果收到了数据（就算不是顺序的），或者收到keepalive请求
@@ -690,6 +740,14 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
         int recv_wndsz = btcp_recv_queue_get_available_space(&handler->recv_buf);
         hdr->window = htons(recv_wndsz);
         int offset = sizeof(struct btcp_tcphdr);
+        if (sack_option[0] != 0)
+        {
+            memcpy(tcphdr->options+offset, sack_option, sizeof(sack_option));
+            offset += sizeof(sack_option);
+
+            *(uint16_t*)(tcphdr->options+offset) = 0; // padding 首部的长度要求是4B的倍数
+            offset += 2; 
+        }
         btcp_set_tcphdr_offset(offset, &hdr->doff_res_flags);
 
         struct sockaddr_in server_addr;
@@ -705,6 +763,7 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
             close(handler->udp_socket);
             return -1;
         }
+        btcp_print_tcphdr(bigbuffer, "send ack package:");
     }
 
     //收到了对端的合法报文，认为该连接处于活跃状态，更新保活时间戳
@@ -795,6 +854,7 @@ int btcp_tcpcli_connect(const char * ip, short int port, struct btcp_tcpconn_han
     }
     btcp_rtt_init(&handler->rtt);
     btcp_timer_init(&handler->timeout);
+    btcp_sack_blocklist_init(&handler->sack);
     handler->cong_wnd = 1;
     handler->cong_wnd_threshold = 8;
   
@@ -1008,13 +1068,33 @@ int btcp_try_send(struct btcp_tcpconn_handler *handler)
         btcp_errno = ERR_MEM_ERROR;
         goto btcp_try_send_out;
     }
+
     // 做一个特殊处理:如果是 range_to_send 的起止seq比较接近UINT32_MAX，就把rang_list_sent的起止
     // seq都做 btcp_seuquence_round_out，否则substract没有效果，导致重发一些报文
+    // 典型的例子就是：发送窗口=[42亿， 100]，100是回绕了。而range_list_sent记录有[3,8]
+    // 直接减的话没有效果，不会剔除掉[3,8]
     const uint64_t DISTANCE = handler->mss * 1024;
     if ( range_to_send->from + DISTANCE > UINT32_MAX) // 当前local_seq很靠近UINT32_MAX
     {
         GList * iter = NULL;
         for (iter = range_list_sent; iter != NULL; iter = iter->next) 
+        {
+            struct btcp_range* one_range = (struct btcp_range*)iter->data;
+            if (one_range == NULL)
+            {
+                continue;
+            }
+            if (one_range->from < DISTANCE) // 定时器里的记录range的seq很靠近0
+            {
+                one_range->from = btcp_sequence_round_out(one_range->from);
+            } 
+            if (one_range->to < DISTANCE )
+            {
+                one_range->to = btcp_sequence_round_out(one_range->to);
+            } 
+        }
+        // sack_blocklist也是一样的处理一下
+        for (iter = handler->sack.blocklist; iter != NULL; iter = iter->next) 
         {
             struct btcp_range* one_range = (struct btcp_range*)iter->data;
             if (one_range == NULL)
@@ -1044,13 +1124,20 @@ int btcp_try_send(struct btcp_tcpconn_handler *handler)
         #endif
         
     }
-    GList * range_list_result = NULL, *combined_list = NULL;
-    if (btcp_range_subtract(range_list_to_send, range_list_sent, &range_list_result))
+    GList * range_list_result1 = NULL, * range_list_result2 = NULL, *combined_list = NULL;
+    if (btcp_range_subtract(range_list_to_send, range_list_sent, &range_list_result1))
     {
         btcp_errno = ERR_MEM_ERROR;
         goto btcp_try_send_out;
     }
-    btcp_range_list_combine(range_list_result, &combined_list);
+    if (btcp_range_subtract(range_list_result1, handler->sack.blocklist, &range_list_result2))
+    {
+        btcp_errno = ERR_MEM_ERROR;
+        goto btcp_try_send_out;
+    }
+
+
+    btcp_range_list_combine(range_list_result2, &combined_list);
     {
         #ifdef _DETAIL_LOG_
         g_info("data to send:");
@@ -1157,7 +1244,8 @@ int btcp_try_send(struct btcp_tcpconn_handler *handler)
 btcp_try_send_out:
     btcp_range_free_list(range_list_to_send);
     btcp_range_free_list(range_list_sent);
-    btcp_range_free_list(range_list_result);
+    btcp_range_free_list(range_list_result1);
+    btcp_range_free_list(range_list_result2);
     btcp_range_free_list(combined_list);
 
     return retcode;
@@ -1204,6 +1292,7 @@ int btcp_destroy_tcpconn(struct btcp_tcpconn_handler *handler, bool is_server)
     btcp_send_queue_destroy(&handler->send_buf);
     btcp_timer_destroy(&handler->timeout);
     btcp_rtt_destroy(&handler->rtt);
+    btcp_sack_blocklist_destroy(&handler->sack);
        
     return 0;
 

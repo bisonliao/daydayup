@@ -1,7 +1,6 @@
 #include "btcp_recv_queue.h"
 #include <stdio.h>
 #include <string.h>
-#include "btcp_range.h"
 #include "tool.h"
 
 

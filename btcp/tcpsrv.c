@@ -20,17 +20,18 @@ int main(int argc, char** argv)
         return -1;
     }
     btcp_tcpsrv_new_loop_thread(&srv);
-    static char bigbuffer[100*1024];
+    static char bigbuffer[100*1024] __attribute__((aligned(8))); // 用于临时收发包，不会跨线程也不会跨连接使用
+    
     while (1)
     {
         int status = ESTABLISHED;
-        GList *conns = btcp_tcpsrv_get_all_connections(&srv, &status);
+        GList *conns = btcp_tcpsrv_get_all_connections(&srv, &status); //在调用的时候，引擎线程可能在插入删除hash表中的元素，所以要互斥
         if (conns != NULL)
         {
-            struct pollfd pfd[1024];
+            static struct pollfd pfd[MAX_CONN_ALLOWED];
             int i;
             GList * iter;
-            for (iter = conns, i=0; iter != NULL && i < 1024; iter = iter->next, i++)
+            for (iter = conns, i=0; iter != NULL && i < MAX_CONN_ALLOWED; iter = iter->next, i++)
             {
                 const struct btcp_tcpconn_handler * handler = (const struct btcp_tcpconn_handler *)(iter->data);
                 pfd[i].fd = handler->user_socket_pair[0];
@@ -49,11 +50,13 @@ int main(int argc, char** argv)
                     {
 
                         ssize_t received = read(pfd[i].fd, bigbuffer, sizeof(bigbuffer));
-                        g_info("recv remote data, len=%d\n", received);
+                        g_info("recv remote data, len=%d", received);
                         if (received > 0)
                         {
                             bigbuffer[received] = 0;
                             printf("[%s]\n", bigbuffer);
+
+                           
                         }
                         else if (errno == EAGAIN || errno == EWOULDBLOCK)
                         {
@@ -62,6 +65,7 @@ int main(int argc, char** argv)
                     }
                 }
             }
+
             btcp_free_conns_in_glist(conns);
             conns = NULL;
         }
@@ -69,8 +73,6 @@ int main(int argc, char** argv)
         {
             //printf("no established conns\n");
         }
-        
-        usleep(1000000);
     }
     return 0;
     

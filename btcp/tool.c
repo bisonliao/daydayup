@@ -379,7 +379,7 @@ int btcp_print_tcphdr(const char*bigbuffer, const char * msg)
 {
     union btcp_tcphdr_with_option *tcphdr = (union btcp_tcphdr_with_option *)bigbuffer;
     struct btcp_tcphdr * hdr = &tcphdr->base_hdr;
-    printf("%s ack_seq:%u, dest port:%d, source port:%d, seq:%u, data offset:%d, windowsz:%d, SYNC=%d, ACK=%d\n", 
+    g_info("%s ack_seq:%u, dest port:%d, source port:%d, seq:%u, data offset:%d, windowsz:%d, SYNC=%d, ACK=%d", 
         msg,
         ntohl(hdr->ack_seq), 
         ntohs(hdr->dest), 

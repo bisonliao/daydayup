@@ -16,7 +16,7 @@
 该文档定义引擎内部使用的一些函数和符号，不暴露给开发者
 */
 
-#define MAX_CONN_ALLOWED (100000)
+#define MAX_CONN_ALLOWED (10000)
 
 #if 1
 

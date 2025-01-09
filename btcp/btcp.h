@@ -56,6 +56,10 @@ struct btcp_tcpsrv_handler
 
     int local_port;
 
+    // 用户线程和引擎线程可能同时访问下面的hash表，用这个来互斥：
+    // 引擎修改hashtable的时候要上锁
+    // 用户线程迭代器获得所有hashtable中的value的时候要上锁
+    pthread_mutex_t all_connections_mutex; 
     GHashTable * all_connections;
 };
 
@@ -69,6 +73,8 @@ struct btcp_tcpconn_handler
     int peer_recv_wnd_sz;
     int cong_wnd;
     int cong_wnd_threshold;
+    //cong_wnd上一次加一的时间，用于超过threshold后每个rtt轮次加一，简单起见，我这里实现为每秒钟加一 
+    time_t cong_wnd_prev_inc_time; 
 
     int repeat_ack;
     time_t alive_time_stamp; //保活时间戳 记录本连接最后一次活跃时刻

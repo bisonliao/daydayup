@@ -41,7 +41,7 @@ int main(int argc, char** argv)
         }
         int iret = write(handler.user_socket_pair[0], buf, sz);
         printf("write %d bytes into engine, %u\n", iret, &handler);
-        usleep(1000000* 10);
+        usleep(1000000*1);
     }
     return 0;
 }

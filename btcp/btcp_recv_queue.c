@@ -8,14 +8,21 @@
 // 计算 range的起止位置 position 距离quene的tail的步长，且确保步长不要超过队列空闲可写空间的范围
 static int calc_step(struct btcp_recv_queue *queue, uint64_t position, uint64_t *result)
 {
-    position = btcp_sequence_round_in(position);
+    //如果超过 UINT32_MAX，就转换为小于UINT32_MAX的整数
+    position = btcp_sequence_round_in(position); 
   
     uint64_t step;
-    if (position >= queue->expected_seq) {step = position - queue->expected_seq;}
-    else {step = btcp_sequence_round_out((uint32_t)position) - queue->expected_seq ;}
+    if (position >= queue->expected_seq) 
+    {
+        step = position - queue->expected_seq;
+    }
+    else 
+    {
+        step = btcp_sequence_round_out((uint32_t)position) - queue->expected_seq ;
+    }
     if ( (step+1) > btcp_recv_queue_get_available_space(queue))
     {
-        fprintf(stderr, "fatal error! %s %d, %llu, %d, %llu, %u\n", __FILE__, __LINE__,
+        g_warning("fatal error! %s %d, %llu, %d, %llu, %u\n", __FILE__, __LINE__,
                 step, btcp_recv_queue_get_available_space(queue), position, queue->expected_seq);
     
         return -1;
@@ -120,7 +127,7 @@ void btcp_recv_queue_clear(struct btcp_recv_queue *queue) {
 }
 
 
-
+#if 0
 // 从队列里取一段数据，数据的范围由其对应的seq对应[from, to]
 int btcp_recv_queue_fetch_data(struct btcp_recv_queue *queue, uint64_t from, uint64_t to, unsigned char* data)
 {
@@ -140,6 +147,7 @@ int btcp_recv_queue_fetch_data(struct btcp_recv_queue *queue, uint64_t from, uin
     }
     return 0;
 }
+#endif
 // 向队列里保存一段数据，数据的范围由其对应的seq对应[from, to]
 int btcp_recv_queue_save_data(struct btcp_recv_queue *queue, uint64_t from, uint64_t to, 
             const unsigned char* data)
@@ -207,7 +215,7 @@ int btcp_recv_queue_try_move_wnd(struct btcp_recv_queue *queue)
             uint64_t steps =  range->to - range->from + 1;
             if ((steps + 1) > btcp_recv_queue_get_available_space(queue))
             {
-                fprintf(stderr, "fatal error! %s %d\n", __FILE__, __LINE__);
+                g_warning( "fatal error! %s %d", __FILE__, __LINE__);
                 return -1;
             }
 #ifdef _P_

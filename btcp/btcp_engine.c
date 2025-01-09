@@ -97,6 +97,7 @@ int btcp_tcpsrv_listen(const char * ip, short int port, struct btcp_tcpsrv_handl
         srv->udp_socket = sockfd;
     }
     {
+        pthread_mutex_init(&srv->all_connections_mutex, NULL);
         srv->all_connections = g_hash_table_new_full(btcp_tcpconn_hash, btcp_tcpconn_equal,
                 btcp_tcpconn_key_destroy, btcp_tcpconn_value_destroy);
         if (srv->all_connections == NULL)
@@ -317,9 +318,9 @@ int btcp_increase_cong_wnd(struct btcp_tcpconn_handler *handler)
     }
     else // 超过 阈值后，就是每个rtt轮次加1， 我这里实现为简单的每秒加1
     {
-        static time_t prev_inc_t = 0;
+        
         time_t current = time(NULL);
-        if (current == prev_inc_t)
+        if (current == handler->cong_wnd_prev_inc_time)
         {
             //不加，这一秒时间间隔里已经加过了
         }
@@ -327,7 +328,7 @@ int btcp_increase_cong_wnd(struct btcp_tcpconn_handler *handler)
         {
             handler->cong_wnd++;
             g_info("congest wnd:%d", handler->cong_wnd);
-            prev_inc_t = current; //记录时间，避免重复加
+            handler->cong_wnd_prev_inc_time = current; //记录时间，避免重复加
         }
     }
     return 0;
@@ -362,9 +363,24 @@ int btcp_handle_ack(union btcp_tcphdr_with_option *tcphdr, struct btcp_tcpconn_h
     uint64_t ack_seq64 = ack_seq32;
 
     
-    if (ack_seq32 < handler->local_seq) //发生了回绕
+    if (ack_seq32 < handler->local_seq) //可能发生了回绕
     {
         ack_seq64 = btcp_sequence_round_out(ack_seq32);
+
+        #if 0
+
+        const uint64_t DISTANCE = handler->mss * 1024;
+        if ( handler->local_seq + DISTANCE > UINT32_MAX) // 当前local_seq很靠近UINT32_MAX
+        {
+            ack_seq64 = btcp_sequence_round_out(ack_seq32);
+        }
+        else
+        {
+            g_warning("ack seq invalid. throw away.");
+            return 0;
+        }
+        #endif
+        
     }
 
     btcp_rtt_update_rtt(&handler->rtt, ack_seq32);
@@ -384,6 +400,8 @@ int btcp_handle_ack(union btcp_tcphdr_with_option *tcphdr, struct btcp_tcpconn_h
             btcp_shrink_cong_wnd(handler, true);
             btcp_timer_remove_by_from(&handler->timeout, handler->local_seq);//删除计时器里起始seq等于local_seq的记录
             //btcp_try_send(handler); //删掉计时器里的记录，其实后面就会比较及时的重发
+
+            g_info("repeated ack 3 times!");
         }
     }
     else
@@ -504,6 +522,48 @@ int btcp_throw_data_to_user(struct btcp_tcpconn_handler * handler)
     }
     return 0;
 }
+#if 0
+static btcp_check_sequence(struct btcp_tcpconn_handler * handler, uint32_t seq32, bool is_keepavlie_req)
+{
+    if (seq32 < handler->peer_seq) //处理发过来的报文seq偏小的特殊情况 
+    {
+        if (is_keepavlie_req) //前面判断过这是个keep alive报文，那没事，是合法的
+        {
+
+        }
+        else 
+        {
+            //还可能发生了seq回绕, 超出UINT32_MAX又从0开始了
+            // 特征就是当前记录的sequence比较靠近UINT32_MAX
+            const uint64_t DISTANCE = handler->mss * 1024;
+            if ( handler->peer_seq + DISTANCE > UINT32_MAX) 
+            {
+                int recv_wndsz = btcp_recv_queue_get_available_space(&handler->recv_buf);
+                if (btcp_sequence_round_out(seq32) - handler->peer_seq > recv_wndsz) // 那也太大了
+                {
+                    g_warning("invalid pkg at %s %d, %u,%u", __FILE__, __LINE__, seq32, handler->peer_seq);
+                    return 0;
+                }
+            }
+            else //不属于回绕的情况
+            {
+                g_warning("invalid pkg at %s %d, %u,%u", __FILE__, __LINE__, seq32, handler->peer_seq);
+                return 0;
+            }
+        }
+    } 
+    if (seq32 > handler->peer_seq)
+    {
+        // 有一种情况是 peer_seq刚刚回绕到 小整数例如2，但seq32还是旧一点的seq例如40亿
+        // 这种就是国旗的请求
+        if (step > 1024 * 1024 * 100 &&
+            queue->expected_seq < 1024 * 100)
+        {
+            step = btcp_sequence_round_out(queue->expected_seq) - position;
+        }
+    }
+}
+#endif
 
 int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_handler * handler, 
             const struct sockaddr_in * client_addr)
@@ -555,6 +615,13 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
     }
     //收到报文不在接收窗口内，又不是keep alive报文，那就直接丢弃。
     // 这类非法报文，可能是在途超时到达的老报文或者恶意者攻击
+    /*
+    TCP 拥塞控制中的一个经典问题，称为 “重传冗余” 或 “不必要的重传”。当发送窗口较大且有一定丢包率时
+    例如：假设发送窗口大小为3，起始seq=100，发送了 p1 p2 p3 三个包，其中p1途中丢失了，对端收到了p2 p3 ，
+    会发送三个ack，ack_seq都会等于100。发送端一段时间后就会发现p1, p2 p3都没有被ack而超时，这时候又
+    重新发送p1 p2 p3。对端收到p1后立即移动接收窗口获得了完整的p1 p2 p3, sequence移动到p3报文的末尾字节
+    位置，再接着收到重发的p2 p3，这时候的p2 p3是白白重复传输的。
+    */
     int recv_wndsz = btcp_recv_queue_get_available_space(&handler->recv_buf);
     if (seq32 < handler->peer_seq &&  
         btcp_sequence_round_out(seq32) -handler->peer_seq > recv_wndsz)
@@ -565,7 +632,7 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
             return 0;
         }
         
-    }   
+    } 
     handler->peer_recv_wnd_sz = ntohs(hdr->window); 
     if (data_len > 0)
     {
@@ -943,8 +1010,8 @@ int btcp_try_send(struct btcp_tcpconn_handler *handler)
     }
     // 做一个特殊处理:如果是 range_to_send 的起止seq比较接近UINT32_MAX，就把rang_list_sent的起止
     // seq都做 btcp_seuquence_round_out，否则substract没有效果，导致重发一些报文
-    uint64_t gap = handler->mss * 1024;
-    if ( range_to_send->from + gap > UINT32_MAX) // 当前local_seq很靠近UINT32_MAX
+    const uint64_t DISTANCE = handler->mss * 1024;
+    if ( range_to_send->from + DISTANCE > UINT32_MAX) // 当前local_seq很靠近UINT32_MAX
     {
         GList * iter = NULL;
         for (iter = range_list_sent; iter != NULL; iter = iter->next) 
@@ -954,11 +1021,11 @@ int btcp_try_send(struct btcp_tcpconn_handler *handler)
             {
                 continue;
             }
-            if (one_range->from < gap) // 定时器里的记录range的seq很靠近0
+            if (one_range->from < DISTANCE) // 定时器里的记录range的seq很靠近0
             {
                 one_range->from = btcp_sequence_round_out(one_range->from);
             } 
-            if (one_range->to < gap)
+            if (one_range->to < DISTANCE )
             {
                 one_range->to = btcp_sequence_round_out(one_range->to);
             } 
@@ -1007,7 +1074,7 @@ int btcp_try_send(struct btcp_tcpconn_handler *handler)
         struct btcp_range b_range; // b_range的from to是 64bit 长范围的
         b_range.from = a_range->from;
         b_range.to = a_range->to;
-        static unsigned char bigbuffer[100*1024];
+        static unsigned char bigbuffer[100*1024]  __attribute__((aligned(8))); //临时用一下，不会跨线程，也不会超出函数的作用域
         while (b_range.from <= b_range.to) // 如果超过mss，需要发送多次
         {
             int datalen = b_range.to - b_range.from + 1;
@@ -1149,7 +1216,7 @@ static void* btcp_tcpcli_loop(void *arg)
     printf("btcp_tcpcli_loop() start...,  %d, %u\n", sizeof(void*), handler);
     int timeout = 100; // 默认0.1s
     
-    static char bigbuffer[1024*64] __attribute__((aligned(8))); 
+    static char bigbuffer[1024*64] __attribute__((aligned(8))); //临时用一下，不会跨线程，也不会超出函数的作用域
     struct sockaddr_in client_addr;
     socklen_t addr_len = sizeof(client_addr);
 
@@ -1283,6 +1350,8 @@ static int btcp_tcpsrv_orgnize_poll_fds(struct btcp_tcpsrv_handler * srv, struct
     //  遍历哈希表
     GHashTableIter iter;
     gpointer key, value;
+
+ 
     g_hash_table_iter_init(&iter, srv->all_connections);
     
     while (g_hash_table_iter_next(&iter, &key, &value))
@@ -1294,11 +1363,10 @@ static int btcp_tcpsrv_orgnize_poll_fds(struct btcp_tcpsrv_handler * srv, struct
             fds[i].events = POLLIN;
 
             conns[i] = handler;
-            i++;
-
-            
+            i++; 
         }
     }
+ 
     return i;
 }
 // srv需要对所有连接做的keep alive
@@ -1306,6 +1374,8 @@ static int btcp_tcpsrv_keep_alive(struct btcp_tcpsrv_handler * srv, char *bigbuf
 {
     GHashTableIter iter;
     gpointer key, value;
+
+   
     g_hash_table_iter_init(&iter, srv->all_connections);
     GList *conns_to_close = NULL;
     while (g_hash_table_iter_next(&iter, &key, &value))
@@ -1326,6 +1396,7 @@ static int btcp_tcpsrv_keep_alive(struct btcp_tcpsrv_handler * srv, char *bigbuf
             }
         }
     }
+    
     GList *iter2;
     for (iter2 = conns_to_close; iter2 != NULL; iter2 = iter2->next)
     {
@@ -1381,7 +1452,7 @@ static int btcp_tcpsrv_circular_task(struct btcp_tcpsrv_handler * srv, char *big
 static void* btcp_tcpsrv_loop(void * arg)
 {
     struct btcp_tcpsrv_handler * srv = (struct btcp_tcpsrv_handler*)arg;
-    static char bigbuffer[100*1024]  __attribute__((aligned(8)));
+    static char bigbuffer[100*1024]  __attribute__((aligned(8)));//用于收发包临时数据存储，不会跨线程、不会跨连接
     int timeout = 100;
     
     while (1)
@@ -1418,7 +1489,7 @@ static void* btcp_tcpsrv_loop(void * arg)
                     struct btcp_tcpconn_handler *conn = g_hash_table_lookup(srv->all_connections, &key);
                     if (conn == NULL) // 没有就创建并插入
                     {
-                        if (g_hash_table_size(srv->all_connections) > MAX_CONN_ALLOWED)
+                        if (g_hash_table_size(srv->all_connections) >= MAX_CONN_ALLOWED)
                         {
                             g_warning("max conn allowed reached!");
                             continue;
@@ -1430,19 +1501,23 @@ static void* btcp_tcpsrv_loop(void * arg)
                             fprintf(stderr, "btcp_handle_sync_rcvd1() failed! %d\n", btcp_errno);
                             continue;
                         }
+                        pthread_mutex_lock(&srv->all_connections_mutex);
                         if (!g_hash_table_insert(srv->all_connections, conn, conn)) // 键值都是conn，注意。
                         {
                             g_warning("!!!g_hash_table_insert() failed");
+                            pthread_mutex_unlock(&srv->all_connections_mutex);
                             continue;
                         }
+                        pthread_mutex_unlock(&srv->all_connections_mutex);
                     }
                     else if (conn->status == SYNC_RCVD)
                     {
                         if (btcp_handle_sync_rcvd2(bigbuffer, conn, &client_addr))
                         {
                             fprintf(stderr, "btcp_handle_sync_rcvd2() failed! %d\n", btcp_errno);
-
-                            struct btcp_tcpconn_handler *removed = (struct btcp_tcpconn_handler *)g_hash_table_remove(srv->all_connections, &key); // close the connn
+                            pthread_mutex_lock(&srv->all_connections_mutex);
+                            g_hash_table_remove(srv->all_connections, &key); // close the connn
+                            pthread_mutex_unlock(&srv->all_connections_mutex);
                         }
                     }
                     else if (conn->status == ESTABLISHED)
@@ -1511,7 +1586,10 @@ GList *  btcp_tcpsrv_get_all_connections(struct btcp_tcpsrv_handler * srv, int *
     // 遍历哈希表
     GHashTableIter iter;
     gpointer key, value;
+
+    pthread_mutex_lock(&srv->all_connections_mutex);
     g_hash_table_iter_init(&iter, srv->all_connections);
+    
     while (g_hash_table_iter_next(&iter, &key, &value))
     {
 
@@ -1530,6 +1608,7 @@ GList *  btcp_tcpsrv_get_all_connections(struct btcp_tcpsrv_handler * srv, int *
 
         result = g_list_insert(result, conn, 0);
     }
+    pthread_mutex_unlock(&srv->all_connections_mutex);
     return result;
 }
 

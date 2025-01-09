@@ -139,7 +139,11 @@ struct btcp_tcpconn_handler *  btcp_handle_sync_rcvd1(char * bigbuffer,
             btcp_errno = ERR_MEM_ERROR;
             return NULL;
         }
-        memset(handler, 0, sizeof(struct btcp_tcpconn_handler));
+        if (btcp_init_tcpconn(handler))
+        {
+            free(handler);
+            return NULL;
+        }
         handler->peer_port = ntohs(hdr->source);
         char peer_ip[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &client_addr->sin_addr, peer_ip, INET_ADDRSTRLEN);
@@ -160,21 +164,7 @@ struct btcp_tcpconn_handler *  btcp_handle_sync_rcvd1(char * bigbuffer,
         }
         //测试用：
         handler->mss = 5;
-        if (!btcp_recv_queue_init(&handler->recv_buf, DEF_RECV_BUFSZ))
-        {
-            btcp_errno = ERR_INIT_CQ_FAIL;
-            free(handler);
-            return NULL;
-        }
-        if (!btcp_send_queue_init(&handler->send_buf, DEF_SEND_BUFSZ))
-        {
-            btcp_errno = ERR_INIT_CQ_FAIL;
-            free(handler);
-            return NULL;
-        }
-        btcp_rtt_init(&handler->rtt);
-        btcp_timer_init(&handler->timeout);
-        btcp_sack_blocklist_init(&handler->sack);
+        
         handler->cong_wnd = 1;
 
        
@@ -827,6 +817,10 @@ static int btcp_tcpcli_init_udp(struct btcp_tcpconn_handler * handler)
 int btcp_tcpcli_connect(const char * ip, short int port, struct btcp_tcpconn_handler * handler)
 {
     if (strlen(ip) >= INET_ADDRSTRLEN) {btcp_errno = ERR_INVALID_ARG; return -1;}
+    if (btcp_init_tcpconn(handler))
+    {
+        return -1;
+    }
     strcpy(handler->peer_ip, ip);
     g_info("peer ip:%s", handler->peer_ip);
     int mtu = btcp_get_route_mtu(ip);
@@ -842,19 +836,7 @@ int btcp_tcpcli_connect(const char * ip, short int port, struct btcp_tcpconn_han
     }
     //测试用：
     handler->mss = 5;
-    if (!btcp_recv_queue_init(&handler->recv_buf, DEF_RECV_BUFSZ))
-    {
-        btcp_errno = ERR_INIT_CQ_FAIL; 
-        return -1;
-    }
-    if (!btcp_send_queue_init(&handler->send_buf, DEF_SEND_BUFSZ))
-    {
-        btcp_errno = ERR_INIT_CQ_FAIL; 
-        return -1;
-    }
-    btcp_rtt_init(&handler->rtt);
-    btcp_timer_init(&handler->timeout);
-    btcp_sack_blocklist_init(&handler->sack);
+   
     handler->cong_wnd = 1;
     handler->cong_wnd_threshold = 8;
   
@@ -1269,6 +1251,28 @@ int btcp_check_send_timeout(struct btcp_tcpconn_handler *handler)
         
     }
     return timeout_occur;
+}
+int btcp_init_tcpconn(struct btcp_tcpconn_handler *handler)
+{
+    memset(handler, 0, sizeof(struct btcp_tcpconn_handler));
+    
+    if (!btcp_recv_queue_init(&handler->recv_buf, DEF_RECV_BUFSZ))
+    {
+        btcp_errno = ERR_INIT_CQ_FAIL;
+        
+        return -1;
+    }
+    if (!btcp_send_queue_init(&handler->send_buf, DEF_SEND_BUFSZ))
+    {
+        btcp_errno = ERR_INIT_CQ_FAIL;
+        
+        return -1;
+    }
+    btcp_rtt_init(&handler->rtt);
+    btcp_timer_init(&handler->timeout);
+    btcp_sack_blocklist_init(&handler->sack);
+    handler->cong_wnd = 1;
+    return 0;
 }
 int btcp_destroy_tcpconn(struct btcp_tcpconn_handler *handler, bool is_server)
 {

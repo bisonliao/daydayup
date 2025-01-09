@@ -21,7 +21,8 @@ int main(int argc, char** argv)
     }
     btcp_tcpsrv_new_loop_thread(&srv);
     static char bigbuffer[100*1024] __attribute__((aligned(8))); // 用于临时收发包，不会跨线程也不会跨连接使用
-    
+    uint64_t total = 0;
+    char last_char = 0;
     while (1)
     {
         int status = ESTABLISHED;
@@ -55,8 +56,13 @@ int main(int argc, char** argv)
                         {
                             bigbuffer[received] = 0;
                             printf("[%s]\n", bigbuffer);
-
-                           
+                            total += received;
+                            printf(">>>>>>>>>total=%llu\n", total);
+                            if (last_char != 0 && last_char != 'z')
+                            {
+                                g_assert (last_char+1 == bigbuffer[0]);
+                                last_char = bigbuffer[received-1];
+                            }
                         }
                         else if (errno == EAGAIN || errno == EWOULDBLOCK)
                         {
@@ -73,6 +79,7 @@ int main(int argc, char** argv)
         {
             //printf("no established conns\n");
         }
+        
     }
     return 0;
     

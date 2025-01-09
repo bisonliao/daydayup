@@ -23,7 +23,8 @@ int main(int argc, char** argv)
     g_info("in main(), peer ip:%s, mss:%d, peer_port:%d\n", handler.peer_ip, handler.mss, handler.peer_port);
     btcp_tcpcli_new_loop_thread(&handler);
     
-    while (1)
+    uint64_t total = 0;
+    while (total < 100000)
     {
         if (handler.status != ESTABLISHED)
         {
@@ -38,10 +39,41 @@ int main(int argc, char** argv)
         {
             buf[i] = 'a'+i;
         }
-        int iret = write(handler.user_socket_pair[0], buf, sz);
-        printf("write %d bytes into engine, %u\n", iret, &handler);
-        usleep(1000000*5);
+        int offset = 0;
+        while (1)
+        {
+            int iret = write(handler.user_socket_pair[0], buf+offset, sz-offset);
+            if (iret <0 )
+            {
+                if (errno == EAGAIN || errno == EWOULDBLOCK)
+                {
+                    usleep(100);
+                    continue;
+                }
+                else
+                {
+                    perror("write");
+                    return -1;
+                }
+            }
+            else 
+            {
+                total += iret;
+                offset += iret;
+                printf(">>>>>>>>>total=%llu\n", total);
+                if (offset == sz)
+                {
+                    break;
+                }
+    
+            }
+            
+        }
+        
+        usleep(1000000*1);
+        
     }
+    sleep(20);
     return 0;
 }
 

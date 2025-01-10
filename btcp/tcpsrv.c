@@ -26,7 +26,7 @@ int main(int argc, char** argv)
     while (1)
     {
         //int status = ESTABLISHED;
-        GList *conns = btcp_tcpsrv_get_all_connections(&srv, NULL); //在调用的时候，引擎线程可能在插入删除hash表中的元素，所以要互斥
+        GList *conns = btcp_tcpsrv_get_all_conn_fds(&srv, NULL); 
         if (conns != NULL)
         {
             static struct pollfd pfd[MAX_CONN_ALLOWED];
@@ -34,17 +34,16 @@ int main(int argc, char** argv)
             GList * iter;
             for (iter = conns, i=0; iter != NULL && i < MAX_CONN_ALLOWED; iter = iter->next, i++)
             {
-                const struct btcp_tcpconn_handler * handler = (const struct btcp_tcpconn_handler *)(iter->data);
-                pfd[i].fd = handler->user_socket_pair[0];
-                
+                int fd  = GPOINTER_TO_INT(iter->data);
+                pfd[i].fd = fd;
                 pfd[i].events = POLLIN;
               
             }
             int fd_num = i;
             
             
-            int ret = poll(pfd, fd_num, 100); // 1 秒超时
-            //printf("fd num:%d, poll return %d\n", fd_num, ret);
+            int ret = poll(pfd, fd_num, 100); 
+            
             if (ret > 0)
             {
                 for (i = 0; i < fd_num; ++i)

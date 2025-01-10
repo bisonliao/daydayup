@@ -1965,7 +1965,7 @@ int btcp_tcpsrv_new_loop_thread(struct btcp_tcpsrv_handler * srv)
     return 0;
 }
 
-GList *  btcp_tcpsrv_get_all_connections(struct btcp_tcpsrv_handler * srv, int * status)
+GList *  btcp_tcpsrv_get_all_conn_fds(struct btcp_tcpsrv_handler * srv, int * status)
 {
     GList * result = NULL;
     // 遍历哈希表
@@ -1977,39 +1977,36 @@ GList *  btcp_tcpsrv_get_all_connections(struct btcp_tcpsrv_handler * srv, int *
     
     while (g_hash_table_iter_next(&iter, &key, &value))
     {
-
-        if (status != NULL && ((struct btcp_tcpconn_handler *)value)->status != *status)
+        struct btcp_tcpconn_handler * handler = (struct btcp_tcpconn_handler *)value;
+        if (status != NULL && handler->status != *status) //如果指定了需要返回某种状态的连接
         {
             continue;
         }
+        
 
-        struct btcp_tcpconn_handler *conn = (struct btcp_tcpconn_handler *)malloc(sizeof(struct btcp_tcpconn_handler));
-        if (conn == NULL)
-        {
-            btcp_errno = ERR_MEM_ERROR;
-            break;
-        }
-        memcpy(conn, value, sizeof(struct btcp_tcpconn_handler));
-
-        result = g_list_insert(result, conn, 0);
+        result = g_list_insert(result, GINT_TO_POINTER(handler->user_socket_pair[0]), 0);
     }
     pthread_mutex_unlock(&srv->all_connections_mutex);
     return result;
 }
 
+/*
 static void free_one_conn(gpointer data) {
     struct btcp_tcpconn_handler * conn = (struct btcp_tcpconn_handler *)data;
     if (conn != NULL) {
         free(conn);
     }
 }
+*/
 
 void btcp_free_conns_in_glist(GList * conns)
 {
     if (conns == NULL) {return;}
+    /*
     for (const GList *iter = conns; iter != NULL; iter = iter->next) {
         struct btcp_tcpconn_handler *conn = (struct btcp_tcpconn_handler *)iter->data;
         free(conn);
     }
+    */
     g_list_free(conns);
 }

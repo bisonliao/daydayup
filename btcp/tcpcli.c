@@ -24,7 +24,7 @@ int main(int argc, char** argv)
     btcp_tcpcli_new_loop_thread(&handler);
     
     uint64_t total = 0;
-    while (total < 30)
+    while (total < 10000)
     {
         if (handler.status != ESTABLISHED)
         {
@@ -72,14 +72,15 @@ int main(int argc, char** argv)
         }
         #endif
         
-        usleep(1000000*1);
+        //usleep(1000000*1);
         
     }
     g_info("client close the conn");
     close(handler.user_socket_pair[0]);
     while (1)
     {
-        usleep(1000);
+        usleep(2000000);
+        g_info("status=%d", handler.status);
     }
    
     return 0;

@@ -57,6 +57,24 @@ int btcp_get_timeout_sec(struct btcp_tcpconn_handler *handler);
 int btcp_increase_cong_wnd(struct btcp_tcpconn_handler *handler);
 int btcp_shrink_cong_wnd(struct btcp_tcpconn_handler *handler, bool quick);
 
+/////////挥手相关的函数：
+int btcp_enter_fin_wait1(struct btcp_tcpconn_handler *handler, 
+                    char *bigbuffer);
+int btcp_enter_last_ack(struct btcp_tcpconn_handler *handler, 
+                    char *bigbuffer);
+
+int btcp_send_fin_request(struct btcp_tcpconn_handler *handler, 
+                    char *bigbuffer, 
+                    uint32_t * ack_seq);
+int btcp_enter_close_wait(struct btcp_tcpconn_handler *handler, 
+        union btcp_tcphdr_with_option *tcphdr, 
+        char *bigbuffer);
+int btcp_enter_time_wait(struct btcp_tcpconn_handler *handler, 
+                        union btcp_tcphdr_with_option *tcphdr, 
+                        char *bigbuffer);
+int btcp_send_fin_response(struct btcp_tcpconn_handler *handler, 
+                        union btcp_tcphdr_with_option *tcphdr, 
+                        char *bigbuffer);
 
 #endif
 

@@ -142,6 +142,24 @@ int btcp_timer_remove_event(struct btcp_timeout *handler, const void *event, int
 
     return -1;  // 返回 -1 表示未找到匹配的事件
 }
+const void* btcp_timer_find_event(struct btcp_timeout *handler, const void *event, int len, 
+                        int (*event_cmp)(const void *, int, const void *, int))
+{
+    struct btcp_timer_event *current = handler->head;
+    
+    while (current != NULL) 
+    {
+        if (event_cmp(current->event_data, current->event_len, event, len) == 0) 
+        {
+            // 找到匹配的事件
+            return current->event_data;
+
+            current = current->next;
+        }
+    }
+    return NULL;
+
+}
 
 int btcp_timer_remove_range(struct btcp_timeout *handler, const struct btcp_range * range)
 {

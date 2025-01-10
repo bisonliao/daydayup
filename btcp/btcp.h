@@ -47,7 +47,15 @@ enum btcp_tcpconn_status
     CLOSED,
     SYNC_SENT,
     SYNC_RCVD,
-    ESTABLISHED
+    ESTABLISHED,
+
+    FIN_WAIT1,
+    FIN_WAIT2,
+    TIME_WAIT,
+
+    CLOSE_WAIT,
+    LAST_ACK
+
 };
 
 struct btcp_tcpsrv_handler

@@ -36,7 +36,16 @@ bool btcp_send_queue_init(struct btcp_send_queue *queue, int capacity) {
     queue->head = 0;
     queue->tail = 0;
     queue->size = 0;
+    queue->fin_seq = -1;
     return true;
+}
+int btcp_send_queue_push_fin(struct btcp_send_queue *queue)
+{
+    uint64_t fin_seq = queue->start_seq + queue->size;
+    fin_seq = btcp_sequence_round_in(fin_seq);
+    queue->fin_seq = fin_seq;
+    g_info("set fin seq to %llu in send queue", fin_seq);
+    return 0;
 }
 
 // 销毁队列
@@ -49,6 +58,7 @@ void btcp_send_queue_destroy(struct btcp_send_queue *queue) {
     queue->head = 0;
     queue->tail = 0;
     queue->size = 0;
+    queue->fin_seq = -1;
 }
 
 // 检查队列是否为空
@@ -69,6 +79,8 @@ size_t btcp_send_queue_enqueue(struct btcp_send_queue *queue, const unsigned cha
     if (data_len == 0 || data == NULL) {
         return 0;  // 无效输入
     }
+    //如果有fin请求要发送了，那应该没有数据需要放到发送队列里了
+    g_assert(queue->fin_seq < 0); 
 
     size_t available_space = queue->capacity - queue->size;
     size_t bytes_to_enqueue = (data_len > available_space) ? available_space : data_len;

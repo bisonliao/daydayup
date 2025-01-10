@@ -14,6 +14,7 @@ struct btcp_send_queue {
     int tail;               // 队尾指针
     int size;               // 当前队列大小
     uint32_t start_seq;     // 记录head指向的字节对应的seq，head总指向第一个有效字节的位置。为了方便，将类型设置为uint64_t，但大小不超过UINT32_MAX
+    int64_t fin_seq; //有fin请求需要发送时，值介于[0, UINT32_MAX]，否则-1
 };
 
 // 初始化队列
@@ -49,5 +50,8 @@ int btcp_send_queue_fetch_data(struct btcp_send_queue *queue, uint64_t from, uin
 //初始化start_seq，或者修改seq实现发送窗口后移
 // 参数start是想要设置的起始seq，为了方便，将类型设置为uint64_t，但大小不超过UINT32_MAX
 int btcp_send_queue_set_start_seq(struct btcp_send_queue *queue, uint64_t start); 
+
+// 在末尾追加一个fin请求待发送, 只修改fin_seq字段，不会占用队列空间
+int btcp_send_queue_push_fin(struct btcp_send_queue *queue);
 
 #endif // BTCP_SEND_QUEUE_H

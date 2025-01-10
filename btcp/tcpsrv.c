@@ -25,8 +25,8 @@ int main(int argc, char** argv)
     char last_char = 0;
     while (1)
     {
-        int status = ESTABLISHED;
-        GList *conns = btcp_tcpsrv_get_all_connections(&srv, &status); //在调用的时候，引擎线程可能在插入删除hash表中的元素，所以要互斥
+        //int status = ESTABLISHED;
+        GList *conns = btcp_tcpsrv_get_all_connections(&srv, NULL); //在调用的时候，引擎线程可能在插入删除hash表中的元素，所以要互斥
         if (conns != NULL)
         {
             static struct pollfd pfd[MAX_CONN_ALLOWED];
@@ -36,7 +36,9 @@ int main(int argc, char** argv)
             {
                 const struct btcp_tcpconn_handler * handler = (const struct btcp_tcpconn_handler *)(iter->data);
                 pfd[i].fd = handler->user_socket_pair[0];
+                
                 pfd[i].events = POLLIN;
+                write(handler->user_socket_pair[0], "hello", 5);
             }
             int fd_num = i;
             
@@ -64,9 +66,16 @@ int main(int argc, char** argv)
                                 last_char = bigbuffer[received-1];
                             }
                         }
-                        else if (errno == EAGAIN || errno == EWOULDBLOCK)
+                        else if (received == 0)
                         {
-                            printf("No data available.\n");
+                            g_info("detect remote closed");
+                            close(pfd[i].fd);
+                        }
+                        else 
+                        {
+                            if (errno == EAGAIN || errno == EWOULDBLOCK){
+                                printf("No data available.\n");
+                            }
                         }
                     }
                 }

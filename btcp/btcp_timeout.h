@@ -48,5 +48,9 @@ int btcp_timer_remove_range(struct btcp_timeout *handler, const struct btcp_rang
 // 删除指定开始seq的事件
 int btcp_timer_remove_by_from(struct btcp_timeout *handler, uint32_t from);
 
+// 搜索指定的事件
+const void* btcp_timer_find_event(struct btcp_timeout *handler, const void *event, int len, 
+                        int (*event_cmp)(const void *, int, const void *, int));
+
 
 #endif // btcp_timer_H

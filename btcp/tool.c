@@ -379,7 +379,7 @@ int btcp_print_tcphdr(const char*bigbuffer, const char * msg)
 {
     union btcp_tcphdr_with_option *tcphdr = (union btcp_tcphdr_with_option *)bigbuffer;
     struct btcp_tcphdr * hdr = &tcphdr->base_hdr;
-    g_info("%s ack_seq:%u, dest port:%d, source port:%d, seq:%u, data offset:%d, windowsz:%d, SYNC=%d, ACK=%d\n", 
+    g_info("%s ack_seq:%u, dest port:%d, source port:%d, seq:%u, data offset:%d, windowsz:%d, SYNC=%d, ACK=%d, FIN=%d,\n", 
         msg,
         ntohl(hdr->ack_seq), 
         ntohs(hdr->dest), 
@@ -388,7 +388,8 @@ int btcp_print_tcphdr(const char*bigbuffer, const char * msg)
         btcp_get_tcphdr_offset(&hdr->doff_res_flags), 
         ntohs(hdr->window),
         btcp_check_tcphdr_flag(FLAG_SYN, hdr->doff_res_flags),
-        btcp_check_tcphdr_flag(FLAG_ACK, hdr->doff_res_flags)
+        btcp_check_tcphdr_flag(FLAG_ACK, hdr->doff_res_flags),
+        btcp_check_tcphdr_flag(FLAG_FIN, hdr->doff_res_flags)
         );
     return 0;
 }

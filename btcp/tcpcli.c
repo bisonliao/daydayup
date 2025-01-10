@@ -24,7 +24,7 @@ int main(int argc, char** argv)
     btcp_tcpcli_new_loop_thread(&handler);
     
     uint64_t total = 0;
-    while (total < 100000)
+    while (total < 30)
     {
         if (handler.status != ESTABLISHED)
         {
@@ -40,6 +40,7 @@ int main(int argc, char** argv)
             buf[i] = 'a'+i;
         }
         int offset = 0;
+        #if 0
         while (1)
         {
             int iret = write(handler.user_socket_pair[0], buf+offset, sz-offset);
@@ -69,11 +70,18 @@ int main(int argc, char** argv)
             }
             
         }
+        #endif
         
         usleep(1000000*1);
         
     }
-    sleep(20);
+    g_info("client close the conn");
+    //close(handler.user_socket_pair[0]);
+    while (1)
+    {
+        usleep(1000);
+    }
+   
     return 0;
 }
 

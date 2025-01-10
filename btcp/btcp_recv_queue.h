@@ -18,6 +18,7 @@ struct btcp_recv_queue {
     //为了方便，将类型设置为uint64_t，但大小不超过UINT32_MAX
     uint32_t expected_seq;   
     GList * rcvd_range_list; //在当前接收窗口下，已经收到的数据段
+    int64_t fin_seq; //缓存收到的对端发过来的fin请求（可能相比数据报文后发先至先，所以要缓存到接收队列）
 };
 
 // 初始化队列
@@ -60,5 +61,8 @@ int btcp_recv_queue_save_data(struct btcp_recv_queue *queue, uint64_t from, uint
 
 //尝试向前移动接收窗口
 int btcp_recv_queue_try_move_wnd(struct btcp_recv_queue *queue);
+
+//收到了对端发来的fin请求，缓存到接收队列
+int btcp_recv_queue_save_fin_req(struct btcp_recv_queue *queue, uint32_t seq);
 
 #endif // btcp_recv_QUEUE_H

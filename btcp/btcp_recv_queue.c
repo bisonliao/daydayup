@@ -47,6 +47,7 @@ bool btcp_recv_queue_init(struct btcp_recv_queue *queue, int capacity) {
     queue->size = 0;
     queue->expected_seq = 0;
     queue->rcvd_range_list = NULL;
+    queue->fin_seq = -1;
     return true;
 }
 
@@ -60,7 +61,7 @@ void btcp_recv_queue_destroy(struct btcp_recv_queue *queue) {
     queue->head = 0;
     queue->tail = 0;
     queue->size = 0;
-
+    queue->fin_seq = -1;
     btcp_range_free_list(queue->rcvd_range_list);
 
 }
@@ -147,6 +148,12 @@ int btcp_recv_queue_fetch_data(struct btcp_recv_queue *queue, uint64_t from, uin
     return 0;
 }
 #endif
+
+int btcp_recv_queue_save_fin_req(struct btcp_recv_queue *queue, uint32_t seq)
+{
+    queue->fin_seq = seq;
+    return 0;
+}
 // 向队列里保存一段数据，数据的范围由其对应的seq对应[from, to]
 int btcp_recv_queue_save_data(struct btcp_recv_queue *queue, uint64_t from, uint64_t to, 
             const unsigned char* data)
@@ -178,9 +185,7 @@ int btcp_recv_queue_save_data(struct btcp_recv_queue *queue, uint64_t from, uint
 int btcp_recv_queue_try_move_wnd(struct btcp_recv_queue *queue)
 {
 
-    GList *result;
-
-   
+    GList *result = NULL;
 
 #ifdef _P_
     printf("rcvd segment:\n");

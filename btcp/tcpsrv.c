@@ -38,7 +38,7 @@ int main(int argc, char** argv)
                 pfd[i].fd = handler->user_socket_pair[0];
                 
                 pfd[i].events = POLLIN;
-                write(handler->user_socket_pair[0], "hello", 5);
+              
             }
             int fd_num = i;
             
@@ -68,7 +68,7 @@ int main(int argc, char** argv)
                         }
                         else if (received == 0)
                         {
-                            g_info("detect remote closed");
+                            g_info("detect remote closed, I close the conn too. %d", pfd[i].fd);
                             close(pfd[i].fd);
                         }
                         else 

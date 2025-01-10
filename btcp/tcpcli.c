@@ -40,7 +40,7 @@ int main(int argc, char** argv)
             buf[i] = 'a'+i;
         }
         int offset = 0;
-        #if 0
+        #if 1
         while (1)
         {
             int iret = write(handler.user_socket_pair[0], buf+offset, sz-offset);
@@ -76,7 +76,7 @@ int main(int argc, char** argv)
         
     }
     g_info("client close the conn");
-    //close(handler.user_socket_pair[0]);
+    close(handler.user_socket_pair[0]);
     while (1)
     {
         usleep(1000);

@@ -284,6 +284,7 @@ int btcp_handle_sync_rcvd2(char * bigbuffer,  struct btcp_tcpconn_handler * hand
         perror("socketpair");
         exit(EXIT_FAILURE);
     }
+    g_info("create socketpair:%d,%d", handler->user_socket_pair[0], handler->user_socket_pair[1]);
     
     btcp_set_socket_nonblock(handler->user_socket_pair[0]);
     btcp_set_socket_nonblock(handler->user_socket_pair[1]);
@@ -377,18 +378,36 @@ int btcp_handle_ack(union btcp_tcphdr_with_option *tcphdr, struct btcp_tcpconn_h
     //挥手时候的特殊情况
     if (handler->status == FIN_WAIT1)
     {
+        struct btcp_range range;
+        range.from = handler->local_seq;
+        range.to = handler->local_seq;
+
         handler->status = FIN_WAIT2;
         handler->local_seq = ack_seq32;
         btcp_send_queue_set_start_seq(&handler->send_buf, handler->local_seq);
+
         g_info("enter fin_wait2 status");
+
+        g_info("local sequence step forward to %u", handler->local_seq);
+        // 删除可能的定时器
+        btcp_timer_remove_range(&handler->timeout, &range);
         return 0;
     }
     if (handler->status == LAST_ACK)
     {
+        struct btcp_range range;
+        range.from = handler->local_seq;
+        range.to = handler->local_seq;
+
         handler->status = CLOSED;
+
         handler->local_seq = ack_seq32;
         btcp_send_queue_set_start_seq(&handler->send_buf, handler->local_seq);
+
         g_info("enter closed status");
+
+        // 删除可能的定时器
+        btcp_timer_remove_range(&handler->timeout, &range);
         return 0;
     }
 
@@ -868,7 +887,7 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
         // fin请求占用 1 sequence
         handler->peer_seq = btcp_sequence_step_forward(handler->peer_seq, 1);
         btcp_recv_queue_set_expected_seq(&handler->recv_buf, handler->peer_seq);
-        close(handler->user_socket_pair[1]);
+        shutdown(handler->user_socket_pair[1], SHUT_WR);
         // 有两种情况
         int iret;
         if (handler->status == ESTABLISHED)
@@ -1441,11 +1460,11 @@ int btcp_try_send(struct btcp_tcpconn_handler *handler)
     {
         
         #if 1
-        if (handler->status == ESTABLISHED)
+        if (handler->status == ESTABLISHED || handler->status == FIN_WAIT1) //后面这个或，是因为可能需要重发fin req
         {
             btcp_enter_fin_wait1(handler, bigbuffer);
         }
-        else if (handler->status == CLOSE_WAIT)
+        else if (handler->status == CLOSE_WAIT|| handler->status == LAST_ACK)//后面这个或，是因为可能需要重发fin req
         {
             btcp_enter_last_ack(handler, bigbuffer);
         }
@@ -1641,7 +1660,7 @@ static void* btcp_tcpcli_loop(void *arg)
         }
         btcp_try_send(handler); // 尝试发tcp包
 
-        #if 0
+        #if 1
         if (btcp_keep_alive(handler, bigbuffer, false) == 1)
         {
             g_info("keepalive close the conn to (%s,%d)", handler->peer_ip, handler->peer_port);
@@ -1724,9 +1743,7 @@ static int btcp_tcpsrv_keep_alive(struct btcp_tcpsrv_handler * srv, char *bigbuf
     GHashTableIter iter;
     gpointer key, value;
     
-    return 0;
-
-   
+     
     g_hash_table_iter_init(&iter, srv->all_connections);
     GList *conns_to_close = NULL;
     while (g_hash_table_iter_next(&iter, &key, &value))
@@ -1871,7 +1888,7 @@ static void* btcp_tcpsrv_loop(void * arg)
                             pthread_mutex_unlock(&srv->all_connections_mutex);
                         }
                     }
-                    else if (conn->status == ESTABLISHED)
+                    else if (conn->status != CLOSED)
                     {
                         if (btcp_handle_data_rcvd(bigbuffer, pkg_len, conn, &client_addr))
                         {
@@ -1909,7 +1926,7 @@ static void* btcp_tcpsrv_loop(void * arg)
                         else if (received == 0) //用户层关闭了socketpair，需要对tcpconn做FIN
                         {
                             //上层应用主动关闭，有两种情况
-                            g_info("server side, user closed the conn");
+                            //g_info("server side, user closed the conn");
                             if (handler->status == ESTABLISHED || handler->status == CLOSE_WAIT)
                             {
                                btcp_send_queue_push_fin(&handler->send_buf);

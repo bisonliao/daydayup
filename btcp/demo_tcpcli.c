@@ -1,46 +1,48 @@
-#include "btcp.h"
+#include "btcp_api.h"
 #include <poll.h>
 #include <err.h>
 #include <errno.h>
 #include <pthread.h>
 #include <glib.h>
 #include <unistd.h>
+/*
+ * 正如文件名字所说，这是一个 tcp client的用户程序 demo
+ */
 
 
 int main(int argc, char** argv)
 {
     static struct btcp_tcpconn_handler handler;
-#if 0
-    g_log_set_handler(NULL, G_LOG_LEVEL_WARNING | G_LOG_LEVEL_ERROR | G_LOG_LEVEL_CRITICAL|G_LOG_LEVEL_INFO,
-                      g_log_default_handler, NULL);
-#endif
     
     if (btcp_tcpcli_connect("192.168.0.11", 8080, &handler))
     {
-        printf("btcp_tcpcli_connect failed! %d\n", btcp_errno);
+        g_warning("btcp_tcpcli_connect failed! %d", btcp_errno);
         return -1;
     }
     g_info("in main(), peer ip:%s, mss:%d, peer_port:%d\n", handler.peer_ip, handler.mss, handler.peer_port);
-    btcp_tcpcli_new_loop_thread(&handler);
     
-    uint64_t total = 0;
+    btcp_tcpcli_new_loop_thread(&handler); // 启动tcp引擎的工作线程
+    
+    uint64_t total = 0; // 统计用户层发送了多少字节
     while (total < 10000)
     {
         if (handler.status != ESTABLISHED)
         {
-            //printf("waiting...\n");
             usleep(1000);
             continue;
         }
+
+        // 准备 26个英文小写字母
         char buf[1024];
         ssize_t sz = 26;
-        //sz = read(0, buf, sizeof(buf));
+        
         for (int i = 0; i < sz; ++i)
         {
             buf[i] = 'a'+i;
         }
         int offset = 0;
-        #if 1
+       
+        // 不断的通过tcp连接发送给服务器
         while (1)
         {
             int iret = write(handler.user_socket_pair[0], buf+offset, sz-offset);
@@ -61,7 +63,7 @@ int main(int argc, char** argv)
             {
                 total += iret;
                 offset += iret;
-                printf(">>>>>>>>>total=%llu\n", total);
+                g_info(">>>>>>>>>total=%llu", total);
                 if (offset == sz)
                 {
                     break;
@@ -70,9 +72,8 @@ int main(int argc, char** argv)
             }
             
         }
-        #endif
-        
-        //usleep(1000000*1);
+       
+        usleep(1000000*3);
         
     }
     g_info("client close the conn");

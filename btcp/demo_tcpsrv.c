@@ -1,12 +1,14 @@
-#include "btcp.h"
-#include "btcp_engine.h"
+#include "btcp_api.h"
+
 
 #include <poll.h>
 #include <err.h>
 #include <errno.h>
 #include  <glib.h>
 
-
+/*
+ * 正如文件名字所说，这是一个 tcp server 的用户程序 demo
+ */
 
 
 int main(int argc, char** argv)

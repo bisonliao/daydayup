@@ -3,6 +3,9 @@
 #include <string.h>
 #include "tool.h"
 
+/*
+ * 接收队列的实现
+ */
 
 // 计算 range的起止位置 position 距离quene的tail的步长，且确保步长不要超过队列空闲可写空间的范围
 static int calc_step(struct btcp_recv_queue *queue, uint64_t position, uint64_t *result)
@@ -11,18 +14,18 @@ static int calc_step(struct btcp_recv_queue *queue, uint64_t position, uint64_t 
     position = btcp_sequence_round_in(position); 
   
     uint64_t step;
-    if (position >= queue->expected_seq) 
+    if (position >= queue->start_seq) 
     {
-        step = position - queue->expected_seq;
+        step = position - queue->start_seq;
     }
     else 
     {
-        step = btcp_sequence_round_out((uint32_t)position) - queue->expected_seq ;
+        step = btcp_sequence_round_out((uint32_t)position) - queue->start_seq ;
     }
     if ( (step+1) > btcp_recv_queue_get_available_space(queue))
     {
         g_warning("fatal error! %s %d, %llu, %d, %llu, %u\n", __FILE__, __LINE__,
-                step, btcp_recv_queue_get_available_space(queue), position, queue->expected_seq);
+                step, btcp_recv_queue_get_available_space(queue), position, queue->start_seq);
     
         return -1;
     }
@@ -45,7 +48,7 @@ bool btcp_recv_queue_init(struct btcp_recv_queue *queue, int capacity) {
     queue->head = 0;
     queue->tail = 0;
     queue->size = 0;
-    queue->expected_seq = 0;
+    queue->start_seq = 0;
     queue->rcvd_range_list = NULL;
     queue->fin_seq = -1;
     return true;
@@ -190,7 +193,7 @@ int btcp_recv_queue_try_move_wnd(struct btcp_recv_queue *queue)
 #ifdef _P_
     printf("rcvd segment:\n");
     btcp_range_print_list(queue->rcvd_range_list);
-    printf("wnd start seq:%u\n", queue->expected_seq);
+    printf("wnd start seq:%u\n", queue->start_seq);
 #endif
 
     btcp_range_list_combine(queue->rcvd_range_list, &result);
@@ -213,7 +216,7 @@ int btcp_recv_queue_try_move_wnd(struct btcp_recv_queue *queue)
     while ( iter != NULL)
     {
         struct btcp_range *range = (struct btcp_range *)iter->data;
-        if (range->from == queue->expected_seq) //收到了一段紧接着 expected_seq 的数据
+        if (range->from == queue->start_seq) //收到了一段紧接着 start_seq 的数据
         {
             //move wnd
             uint64_t steps =  range->to - range->from + 1;
@@ -224,15 +227,15 @@ int btcp_recv_queue_try_move_wnd(struct btcp_recv_queue *queue)
             }
 #ifdef _P_
             printf("move wnd, steps=%llu, [%llu, %llu]\n", steps, range->from, range->to);
-            printf("before move, expected_seq:%u, tail:%d, size:%d\n", queue->expected_seq, 
+            printf("before move, start_seq:%u, tail:%d, size:%d\n", queue->start_seq, 
                                                 queue->tail,
                                                 queue->size); 
 #endif
-            queue->expected_seq = btcp_sequence_round_in(range->to+1) ;
+            queue->start_seq = btcp_sequence_round_in(range->to+1) ;
             queue->tail = (queue->tail + steps) % (queue->capacity);
             queue->size += steps;
 #ifdef _P_
-            printf("after move, expected_seq:%u, tail:%d, size:%d\n", queue->expected_seq, 
+            printf("after move, start_seq:%u, tail:%d, size:%d\n", queue->start_seq, 
                                                 queue->tail,
                                                 queue->size); 
 #endif
@@ -262,12 +265,12 @@ int btcp_recv_queue_try_move_wnd(struct btcp_recv_queue *queue)
 
 }
 
-//初始化expected_seq，或者修改seq实现窗口后移
-int btcp_recv_queue_set_expected_seq(struct btcp_recv_queue *queue, uint64_t start)
+//初始化start_seq，或者修改seq实现窗口后移
+int btcp_recv_queue_set_start_seq(struct btcp_recv_queue *queue, uint64_t start)
 {
     if (btcp_recv_queue_is_empty(queue))
     {
-        queue->expected_seq = btcp_sequence_round_in(start) ;
+        queue->start_seq = btcp_sequence_round_in(start) ;
         return 0;
     }
     uint64_t step;
@@ -277,7 +280,7 @@ int btcp_recv_queue_set_expected_seq(struct btcp_recv_queue *queue, uint64_t sta
     }
     
     queue->tail = (queue->tail + step) % queue->capacity;
-    queue->expected_seq = btcp_sequence_round_in( queue->expected_seq + step) ;
+    queue->start_seq = btcp_sequence_round_in( queue->start_seq + step) ;
     queue->size += step;
     return 0;
 }

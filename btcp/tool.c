@@ -481,7 +481,7 @@ static int btcp_range_compare(const struct btcp_range *r1, const struct btcp_ran
 }
 
 // 检查两个 range 是否重叠
-static int btcp_range_overlap(const struct btcp_range *r1, const struct btcp_range *r2) {
+int btcp_range_overlap(const struct btcp_range *r1, const struct btcp_range *r2) {
     return (r1->from <= r2->to && r1->to >= r2->from);
 }
 
@@ -652,7 +652,7 @@ void btcp_range_free_list(GList *list) {
     g_list_free(list);  // 释放链表
 }
 
-int btcp_range_cmp(const void *a, int a_len, const void *b, int b_len)
+int btcp_range_equal(const void *a, int a_len, const void *b, int b_len)
 {
     struct btcp_range * aa = (struct btcp_range * )a;
     struct btcp_range * bb = (struct btcp_range * )b;

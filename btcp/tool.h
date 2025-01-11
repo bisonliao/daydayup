@@ -16,9 +16,18 @@
 #include <unistd.h>
 #include <glib.h>
 
+/*
+ *这是一个工具模块，包含了一些比较底层、通用的工具函数
+ */
+
 
 int btcp_set_socket_nonblock(int sockfd);
 int btcp_is_readable(int sockfd, int to, char * bigbuffer, int buflen, struct sockaddr_in *client_addr);
+
+/*
+ * tcp的sequence是32bit的，很容易就用完并且要回绕
+ * 下面这些函数就提供了对sequence回绕和增减的处理
+ */
 // 回绕到32bit正整数范围内
 uint32_t btcp_sequence_round_in(uint64_t original);
 // 将发生了回绕的32bit正整数展开到64bit值
@@ -32,6 +41,12 @@ uint32_t btcp_sequence_step_back(uint32_t original, uint32_t steps);
 uint64_t btcp_get_monotonic_msec(); 
 
 
+/*
+ * tcp发送窗口里的数据是一段一段发送出去的，每一段用range来描述
+ * 那么在反复尝试发送数据的时候，由于发送窗口大小在不断变化、已经发送的数据有的丢包了有的在途
+ * 所以需要一些函数来进行 range的运算
+ * 下面这些函数就提供了对range的运算
+ */
 
 // 定义 range 结构体
 struct btcp_range {
@@ -54,8 +69,10 @@ Combined result: [1, 12]
 */
 // 把列表里的有重叠或者连续的range都合并
 int btcp_range_list_combine(GList *a, GList **result) ;
-
-int btcp_range_cmp(const void *, int, const void *, int);
+// 两个range的相等比较
+int btcp_range_equal(const void *, int, const void *, int);
+// 两个range是否有重叠的判断
+int btcp_range_overlap(const struct btcp_range *r1, const struct btcp_range *r2);
 
 
 #endif

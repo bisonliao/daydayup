@@ -1,8 +1,12 @@
-#include "btcp.h"
+#include "btcp_api.h"
 #include "btcp_engine.h"
 #include <poll.h>
 #include <stdint.h>
-
+/*
+ * tcp 引擎的实现， 主要形式是一个死循环的工作线程
+ * 它不断的从底层udp套接字和 user_socket_pair 收发包，沟通用户态程序和对端的tcp通信者
+ * 它在与对端tcp通信的时候，采取tcp协议的拥塞控制、窗口控制等算法
+ */
 
 // 哈希函数
 static guint btcp_tcpconn_hash(gconstpointer key) {
@@ -162,7 +166,7 @@ struct btcp_tcpconn_handler *  btcp_handle_sync_rcvd1(char * bigbuffer,
             free(handler);
             return NULL;
         }
-        //测试用：
+        //todo:测试用，要注释掉
         handler->mss = 5;
         
         handler->cong_wnd = 1;
@@ -177,7 +181,7 @@ struct btcp_tcpconn_handler *  btcp_handle_sync_rcvd1(char * bigbuffer,
     }
 
     handler->peer_seq = btcp_sequence_step_forward(ntohl(hdr->seq), 1);
-    btcp_recv_queue_set_expected_seq(&handler->recv_buf, handler->peer_seq);
+    btcp_recv_queue_set_start_seq(&handler->recv_buf, handler->peer_seq);
     handler->peer_recv_wnd_sz = ntohs(hdr->window);
 
     int offset = sizeof(struct btcp_tcphdr);
@@ -612,11 +616,11 @@ static btcp_check_sequence(struct btcp_tcpconn_handler * handler, uint32_t seq32
     if (seq32 > handler->peer_seq)
     {
         // 有一种情况是 peer_seq刚刚回绕到 小整数例如2，但seq32还是旧一点的seq例如40亿
-        // 这种就是国旗的请求
+        // 这种就是过期的请求
         if (step > 1024 * 1024 * 100 &&
-            queue->expected_seq < 1024 * 100)
+            queue->start_seq < 1024 * 100)
         {
-            step = btcp_sequence_round_out(queue->expected_seq) - position;
+            step = btcp_sequence_round_out(queue->start_seq) - position;
         }
     }
 }
@@ -736,7 +740,7 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
     /*
     TCP 拥塞控制中的一个经典问题，称为 “重传冗余” 或 “不必要的重传”。当发送窗口较大且有一定丢包率时
     例如：假设发送窗口大小为3，起始seq=100，发送了 p1 p2 p3 三个包，其中p1途中丢失了，对端收到了p2 p3 ，
-    会发送三个ack，ack_seq都会等于100。发送端一段时间后就会发现p1, p2 p3都没有被ack而超时，这时候又
+    会发送2个ack，ack_seq都会等于100。发送端一段时间后就会发现p1, p2 p3都没有被ack而超时，这时候又
     重新发送p1 p2 p3。对端收到p1后立即移动接收窗口获得了完整的p1 p2 p3, sequence移动到p3报文的末尾字节
     位置，再接着收到重发的p2 p3，这时候的p2 p3是白白重复传输的。
 
@@ -790,8 +794,8 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
             handler->peer_seq = btcp_sequence_step_forward(handler->peer_seq, steps);
             //本来这里也需要同步的修改recv queue里的expected_seq，但try_move_wnd函数里面已经修改了
 
-            g_info("peer_seq changes to:%u, expected_seq:%u, tail:%d",  handler->peer_seq,
-                    handler->recv_buf.expected_seq,
+            g_info("peer_seq changes to:%u, start_seq:%u, tail:%d",  handler->peer_seq,
+                    handler->recv_buf.start_seq,
                     handler->recv_buf.tail);
             //向应用层抛数据
             btcp_throw_data_to_user(handler);
@@ -886,7 +890,7 @@ int btcp_handle_data_rcvd(char * bigbuffer, int pkg_len, struct btcp_tcpconn_han
         g_info("fin request need to be processed");
         // fin请求占用 1 sequence
         handler->peer_seq = btcp_sequence_step_forward(handler->peer_seq, 1);
-        btcp_recv_queue_set_expected_seq(&handler->recv_buf, handler->peer_seq);
+        btcp_recv_queue_set_start_seq(&handler->recv_buf, handler->peer_seq);
         shutdown(handler->user_socket_pair[1], SHUT_WR);
         // 有两种情况
         int iret;
@@ -969,7 +973,7 @@ int btcp_tcpcli_connect(const char * ip, short int port, struct btcp_tcpconn_han
         btcp_errno = ERR_GET_MTU_FAIL; 
         return -1;
     }
-    //测试用：
+    //todo:测试用，要注释掉
     handler->mss = 5;
    
     handler->cong_wnd = 1;
@@ -1053,7 +1057,7 @@ int btcp_handle_sync_sent(char * bigbuffer,  struct btcp_tcpconn_handler * handl
     }
     
     handler->peer_seq = btcp_sequence_step_forward(ntohl(hdr->seq), 1);
-    btcp_recv_queue_set_expected_seq(&handler->recv_buf, handler->peer_seq);
+    btcp_recv_queue_set_start_seq(&handler->recv_buf, handler->peer_seq);
     uint32_t ack_seq = ntohl(hdr->ack_seq);
     if (ack_seq != (handler->local_seq + 1) )
     {
@@ -1167,7 +1171,7 @@ int btcp_send_fin_request(struct btcp_tcpconn_handler *handler,
     c_range.from = handler->send_buf.fin_seq;
     c_range.to = handler->send_buf.fin_seq;
     if (btcp_timer_find_event(&handler->timeout, &c_range, 
-                        sizeof(struct btcp_range), btcp_range_cmp) != NULL)
+                        sizeof(struct btcp_range), btcp_range_equal) != NULL)
     {
         //还有未超时的已发送的在途的fin请求
         return 0;
@@ -1214,7 +1218,7 @@ int btcp_send_fin_request(struct btcp_tcpconn_handler *handler,
     //  记录超时事件, timer里记录的range的sequence都是32bit范围内的值，方便与ack报文的sequence对应
     int sec = btcp_get_timeout_sec(handler);
     if (btcp_timer_add_event(&handler->timeout, sec, &c_range, sizeof(struct btcp_range),
-                             btcp_range_cmp))
+                             btcp_range_equal))
     {
         g_warning("btcp_timer_add_event() failed!\n");
     }
@@ -1435,7 +1439,7 @@ int btcp_try_send(struct btcp_tcpconn_handler *handler)
 
                 int sec = btcp_get_timeout_sec(handler);
                 if (btcp_timer_add_event(&handler->timeout, sec, &c_range, sizeof(struct btcp_range),
-                                         btcp_range_cmp))
+                                         btcp_range_equal))
                 {
                     g_warning("btcp_timer_add_event() failed!\n");
                     break;

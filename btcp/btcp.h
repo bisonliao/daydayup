@@ -2,6 +2,11 @@
 
 #define BTCP_H_INCLUDED
 
+/*
+ * 这是一个重要且信息很多的头文件，引擎和开发者都需要引用到。
+ * 开发者是通过 #include "btcp_api.h"文件引用到该文件的
+ */
+
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
@@ -42,9 +47,10 @@ unsigned int btcp_get_random();
 #define ERR_UDP_PORT_USED (-109)
 #define ERR_MEM_ERROR (-110)
 
+// tcp连接所处的各种状态
 enum btcp_tcpconn_status
 {
-    CLOSED,
+    CLOSED = 0,
     SYNC_SENT,
     SYNC_RCVD,
     ESTABLISHED,
@@ -58,6 +64,7 @@ enum btcp_tcpconn_status
 
 };
 
+//一个tcpsrv的句柄
 struct btcp_tcpsrv_handler
 {
     int udp_socket;
@@ -69,43 +76,48 @@ struct btcp_tcpsrv_handler
     // 引擎修改hashtable的时候要上锁
     // 用户线程迭代器获得所有hashtable中的value的时候要上锁
     pthread_mutex_t all_connections_mutex; 
-    GHashTable * all_connections;
+    GHashTable * all_connections; //保存了所有tcp连接的hash表
 };
 
+//一条tcp连接的句柄
 struct btcp_tcpconn_handler
 {
     int udp_socket;
     char peer_ip[INET_ADDRSTRLEN];
     char local_ip[INET_ADDRSTRLEN];
 
-    //int local_recv_wnd_sz; //这个字段不需要，直接从recv_buf获取可用空间即可
-    int peer_recv_wnd_sz;
-    int cong_wnd;
-    int cong_wnd_threshold;
-    //cong_wnd上一次加一的时间，用于超过threshold后每个rtt轮次加一，简单起见，我这里实现为每秒钟加一 
+    
+    int peer_recv_wnd_sz; //对端接收窗口的大小，单位为byte
+    int cong_wnd;         // 本端拥塞窗口的大小，单位为mss
+    int cong_wnd_threshold; // 拥塞算法中用到的一个窗口阈值，小于它时指数增长，大于它后线性增长
+
+    //cong_wnd上一次加一的时间，用于超过threshold
+    // 后每个rtt轮次加一，简单起见，我这里实现为每秒钟加一 
     time_t cong_wnd_prev_inc_time; 
 
-    int repeat_ack;
+    int repeat_ack; //当发生丢包的时候，反复收到对端对当前窗口起始sequence的ack，超过3次就重发并收缩窗口
     time_t alive_time_stamp; //保活时间戳 记录本连接最后一次活跃时刻
     time_t keepalive_request_time; //上一次发送keepalive请求的时间，记录下来避免频繁发送
 
     int mss;
-    struct btcp_rtt_handler rtt;
+    struct btcp_rtt_handler rtt; // 用来粗略统计本连接rtt的一个模块
     struct btcp_sack_blocklist sack;
     uint32_t local_seq; //发送窗口（允许未被确认的字节段）的第一个字节编号
     uint32_t peer_seq; //期望收到对端发的顺序包的起始sequence，
     int local_port;
     int peer_port;
-    enum btcp_tcpconn_status status;
+    enum btcp_tcpconn_status status; //连接当前的状态，ESTABLISHED or CLOSED etc.
     
     struct btcp_recv_queue recv_buf; //接收缓冲区
-    
+    struct btcp_send_queue send_buf; //发送缓冲区
+    struct btcp_timeout timeout; //发送的报文的超时控制，可以理解为一个链表
 
-    struct btcp_send_queue send_buf;
-    struct btcp_timeout timeout; //发送的报文的超时控制
-
-    int user_socket_pair[2]; // unix domain socket，用来和上层应用进行收发数据, 上层应用读写user_socket_pair[0], btcp读写user_socket_pair[1]，他们是相连的一对
+    // unix domain socket，用来和上层应用进行收发数据, 上层应用读写user_socket_pair[0], 
+    // btcp读写user_socket_pair[1]，他们是相连的一对
+    int user_socket_pair[2]; 
 };
+
+// tcp首部
 struct btcp_tcphdr
 {
     uint16_t source;      // 源端口号
@@ -130,10 +142,12 @@ struct btcp_tcphdr
     uint16_t check;          // 校验和
     uint16_t urg_ptr;        // 紧急指针  
 };
+
+// 因为tcp首部可能包含不定长的options，编程方便起见，定义这样一个union
 union btcp_tcphdr_with_option
 {
     struct btcp_tcphdr base_hdr; //20Byte
-    // 如果需要处理选项字段，可以额外定义一个选项数组
+    // 如果需要处理选项字段，通过下面的变量进行访问
     uint8_t options[sizeof(struct btcp_tcphdr)+40];  // TCP 选项字段（可选，最长 40 字节）
 };
 enum btcp_tcphdr_flag
@@ -148,28 +162,32 @@ enum btcp_tcphdr_flag
     FLAG_CWR,
     FLAG_NS
 } ;
+
+
+//检查tcp首部flag字段是否设置了某个上述的flag
 int btcp_check_tcphdr_flag(enum btcp_tcphdr_flag flag, uint16_t doff_res_flags);
+
+//将tcp首部清理掉某个上述的flag
 int btcp_clear_tcphdr_flag(enum btcp_tcphdr_flag flag, uint16_t * doff_res_flags);
+
+//将tcp首部设置上某个上述的flag
 int btcp_set_tcphdr_flag(enum btcp_tcphdr_flag flag, uint16_t * doff_res_flags);
 
+// 为tcp首部设置用户数据偏移，也就是用户数据开始的位置
 int btcp_set_tcphdr_offset(int offset, uint16_t * doff_res_flags);
+
+// 从tcp首部获取用户数据偏移，也就是用户数据开始的位置
 int btcp_get_tcphdr_offset(const uint16_t * doff_res_flags);
 
+// 从报文中获取目的端口和发送端口，报文包含tcp首部，存储在bigbuffer中
 int btcp_get_port(const char*bigbuffer, unsigned short * dest, unsigned short *source);
+
+// 打印tcp首部的各个字段，调试用
 int btcp_print_tcphdr(const char*bigbuffer, const char * msg);
 
 
 
 
-//暴露给开发者使用引擎的几个主要函数
-int btcp_tcpsrv_listen(const char * ip, short int port, struct btcp_tcpsrv_handler * srv);
-int btcp_tcpcli_connect(const char * ip, short int port, struct btcp_tcpconn_handler * handler);
-int btcp_tcpcli_new_loop_thread(struct btcp_tcpconn_handler *handler); 
-int btcp_tcpsrv_new_loop_thread(struct btcp_tcpsrv_handler * srv);
-//获取服务器所有已经建联的 btcp_tcpconn_handler
-GList *  btcp_tcpsrv_get_all_conn_fds(struct btcp_tcpsrv_handler * srv, int * status);
-//释放保存了的 btcp_tcpconn_handler的GList，也会释放每个元素
-void btcp_free_conns_in_glist(GList * conns); 
 
 
 #endif

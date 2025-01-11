@@ -4,6 +4,9 @@
 #include <time.h>
 #include "tool.h"
 
+/*
+ * 本模块实现一个定时器。主体是一个链表，记录了未来会超时的事件
+ */
 
 // 初始化超时控制器
 void btcp_timer_init(struct btcp_timeout *handler) {
@@ -40,7 +43,6 @@ int btcp_timer_check(struct btcp_timeout *handler, void *event, int *len) {
 
     // 从链表中移除该事件
     handler->head = current->next;
-    //todo:下面两行free代码会导致crash，还没有搞清楚怎么回事，先注释掉
     free(current->event_data);  // 释放事件数据
     free(current);
 

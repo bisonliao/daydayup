@@ -1,5 +1,6 @@
 #include "btcp_rtt.h"
 
+// 统计rtt的实现
 
 int btcp_rtt_init(struct btcp_rtt_handler * rtt_handler)
 {

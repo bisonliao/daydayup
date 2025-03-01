@@ -34,7 +34,7 @@ def clean(text):
 
 # 从一本书里生成随机的 域名的正例。这样的域名通常含有英文单词
 def get_positive():
-    with open("./data/nietzsche.txt", "rb") as f:
+    with open("d:/jane.txt", "rb") as f:
         char_artical = f.read()
     char_artical = clean(char_artical)
     total_len = len(char_artical)

@@ -1,0 +1,11 @@
+{
+    "interval": 1.0,
+    "seed": 0,
+    "dir": "/home/bison/tsc/FRAP/env/",
+    "roadnetFile": "roadnet.json",
+    "flowFile": "balanced_flow.json",
+    "rlTrafficLight": true,
+    "saveReplay": false,
+    "roadnetLogFile": "logs/testcase_roadnet_3x3.json",
+    "replayLogFile": "logs/testcase_replay_3x3.txt"
+}
